@@ -126,7 +126,27 @@ export const runProbeAgent = hatchet.task({
           ? `Recent actions: ${recentExperiences.map((e: any) => `${e.event} (${new Date(e.timestamp).toISOString().slice(11, 19)})`).join(", ")}`
           : "No recent actions recorded";
 
+      // Build failure context for better AI decision making
+      const recentFailures = recentExperiences
+        .filter(
+          (e: any) =>
+            e.event.includes("failed") ||
+            (e.data && e.data.result && !e.data.result.success),
+        )
+        .map((e: any) => {
+          if (e.data && e.data.result) {
+            return `${e.event}: ${e.data.result.reason || "unknown reason"}`;
+          }
+          return e.event;
+        });
+
+      const failureContext =
+        recentFailures.length > 0
+          ? `Recent failures to avoid repeating: ${recentFailures.join(", ")}`
+          : "No recent failures";
+
       console.log(`🧠 [AI AGENT] ${probe.name} memory: ${memoryContext}`);
+      console.log(`⚠️  [AI AGENT] ${probe.name} failures: ${failureContext}`);
 
       // Use AI to decide what actions to take
       const { object: decision } = await generateObject({
@@ -158,6 +178,12 @@ export const runProbeAgent = hatchet.task({
         IMPORTANT: Look at your recent actions/experiences to avoid repeating the same actions unnecessarily.
         If you've already scanned a body recently, consider harvesting or moving to a new location instead.
         
+        CRITICAL: Learn from failures! If an action failed recently (like travel due to insufficient energy), 
+        don't repeat it immediately. Instead:
+        - If travel failed due to energy, wait or harvest energy first
+        - If manufacturing failed due to resources, gather more resources first
+        - If harvesting failed due to distance, travel closer first
+        
         Be strategic, efficient, and focused on long-term expansion goals.
         
         IMPORTANT: For each action, include a "parameters" object with required fields:
@@ -184,10 +210,11 @@ export const runProbeAgent = hatchet.task({
         Environment:
         - Current System: ${environmentData.currentSystem.name}
         - Nearest Body: ${environmentData.closestBody.name} (${environmentData.distanceToClosest.toFixed(1)} AU)
-        - Available Bodies: ${environmentData.nearbyBodies.map((b: any) => `${b.body.name} (ID: ${b.body.id}, ${b.distance.toFixed(1)} AU, Type: ${b.body.type})`).join(", ")}
+        - Available Bodies: ${environmentData.nearbyBodies.map((b: any) => `${b.body.name} (ID: ${b.body.id}, ${b.distance.toFixed(1)} AU, ~${Math.ceil(b.distance * 2)} energy to travel, Type: ${b.body.type})`).join(", ")}
         
         Memory & Recent Actions:
         - ${memoryContext}
+        - ${failureContext}
         - Visited Systems: ${probeData.memory.visitedSystems.length}
         - Known Probes: ${probeData.memory.knownProbes.length}
         
@@ -199,7 +226,9 @@ export const runProbeAgent = hatchet.task({
         - Your probe has solar panels that automatically generate +20 energy per simulation tick
         - This provides steady passive income even without active harvesting
         - Energy harvesting from celestial bodies provides much larger amounts (50+ per action)
+        - Travel costs: 2 energy per unit distance (much cheaper than before!)
         - Consider energy management: you gain 20 energy per turn automatically
+        - Current distance to Sol Prime II: ~80 units = ~160 energy cost to travel there
         
         Available Actions (with required parameters):
         - scan_resources: Scan a celestial body for resources {"bodyId": "specific_body_id"}
@@ -275,20 +304,13 @@ export const runProbeAgent = hatchet.task({
                 );
 
                 // Add scan experience to memory
-                gameState.updateProbe(input.probeId, {
-                  memory: {
-                    ...probeData.memory,
-                    experiences: [
-                      ...probeData.memory.experiences,
-                      {
-                        timestamp: Date.now(),
-                        event: "scanned_body",
-                        data: {
-                          bodyId: params.bodyId,
-                          result: (result as any)?.["scan-for-resources"],
-                        },
-                      },
-                    ],
+                const scanResult = getTaskResult(result, "scan-for-resources");
+                gameState.addProbeExperience(input.probeId, {
+                  event: "scanned_body",
+                  data: {
+                    bodyId: params.bodyId,
+                    result: scanResult,
+                    success: scanResult?.success || false,
                   },
                 });
               }
@@ -317,24 +339,24 @@ export const runProbeAgent = hatchet.task({
                     result,
                   );
 
-                  // Add travel experience to memory
-                  gameState.updateProbe(input.probeId, {
-                    memory: {
-                      ...probeData.memory,
-                      experiences: [
-                        ...probeData.memory.experiences,
-                        {
-                          timestamp: Date.now(),
-                          event: "traveled_to_body",
-                          data: {
-                            targetBodyId: params.bodyId,
-                            targetBodyName: targetBody.name,
-                            result: result,
-                          },
-                        },
-                      ],
-                    },
-                  });
+                  // Only record travel failures at agent level (successes are recorded by task)
+                  const travelResult = getTaskResult(
+                    result,
+                    "travel-to-position",
+                  );
+
+                  if (!travelResult?.success) {
+                    gameState.addProbeExperience(input.probeId, {
+                      event: "travel_failed",
+                      data: {
+                        targetBodyId: params.bodyId,
+                        targetBodyName: targetBody.name,
+                        result: travelResult,
+                        success: false,
+                        reason: travelResult?.reason,
+                      },
+                    });
+                  }
                 }
               }
               break;
@@ -355,24 +377,23 @@ export const runProbeAgent = hatchet.task({
                   result,
                 );
 
-                // Add harvest experience to memory
-                gameState.updateProbe(input.probeId, {
-                  memory: {
-                    ...probeData.memory,
-                    experiences: [
-                      ...probeData.memory.experiences,
-                      {
-                        timestamp: Date.now(),
-                        event: "harvested_resources",
-                        data: {
-                          bodyId: params.bodyId,
-                          duration: params.duration,
-                          result: result,
-                        },
-                      },
-                    ],
-                  },
-                });
+                // Only record harvest failures at agent level (successes are recorded by task)
+                const harvestResult = getTaskResult(
+                  result,
+                  "harvest-resources",
+                );
+                if (!harvestResult?.success) {
+                  gameState.addProbeExperience(input.probeId, {
+                    event: "harvest_failed",
+                    data: {
+                      bodyId: params.bodyId,
+                      duration: params.duration,
+                      result: harvestResult,
+                      success: false,
+                      reason: harvestResult?.reason,
+                    },
+                  });
+                }
               }
               break;
 
@@ -391,23 +412,23 @@ export const runProbeAgent = hatchet.task({
                   result,
                 );
 
-                // Add manufacturing experience to memory
-                gameState.updateProbe(input.probeId, {
-                  memory: {
-                    ...probeData.memory,
-                    experiences: [
-                      ...probeData.memory.experiences,
-                      {
-                        timestamp: Date.now(),
-                        event: "manufactured_probe",
-                        data: {
-                          newProbeName: params.newProbeName,
-                          result: result,
-                        },
-                      },
-                    ],
-                  },
-                });
+                // Only record manufacturing failures at agent level (successes are recorded by task)
+                const manufactureResult = getTaskResult(
+                  result,
+                  "manufacture-probe",
+                );
+
+                if (!manufactureResult?.success) {
+                  gameState.addProbeExperience(input.probeId, {
+                    event: "manufacturing_failed",
+                    data: {
+                      newProbeName: params.newProbeName,
+                      result: manufactureResult,
+                      success: false,
+                      reason: manufactureResult?.reason,
+                    },
+                  });
+                }
               }
               break;
 
@@ -416,18 +437,9 @@ export const runProbeAgent = hatchet.task({
               console.log(`⏸️  [PROBE ${probe.name}] Waiting...`);
 
               // Add wait experience to memory
-              gameState.updateProbe(input.probeId, {
-                memory: {
-                  ...probeData.memory,
-                  experiences: [
-                    ...probeData.memory.experiences,
-                    {
-                      timestamp: Date.now(),
-                      event: "waited",
-                      data: { reasoning: action.reasoning },
-                    },
-                  ],
-                },
+              gameState.addProbeExperience(input.probeId, {
+                event: "waited",
+                data: { reasoning: action.reasoning },
               });
               break;
 
@@ -436,20 +448,11 @@ export const runProbeAgent = hatchet.task({
               console.log(`🔭 [PROBE ${probe.name}] Exploring system...`);
 
               // Add exploration experience to memory
-              gameState.updateProbe(input.probeId, {
-                memory: {
-                  ...probeData.memory,
-                  experiences: [
-                    ...probeData.memory.experiences,
-                    {
-                      timestamp: Date.now(),
-                      event: "explored_system",
-                      data: {
-                        systemId: probe.currentSystemId,
-                        reasoning: action.reasoning,
-                      },
-                    },
-                  ],
+              gameState.addProbeExperience(input.probeId, {
+                event: "explored_system",
+                data: {
+                  systemId: probe.currentSystemId,
+                  reasoning: action.reasoning,
                 },
               });
               break;

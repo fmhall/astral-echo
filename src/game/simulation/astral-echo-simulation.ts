@@ -30,21 +30,16 @@ function applySolarCharging() {
     };
 
     // Add solar charging experience to memory
-    const newExperience = {
-      timestamp: Date.now(),
+    gameState.addProbeExperience(probe.id, {
       event: "solar_charging",
       data: {
         energyGained: solarEnergyGain,
         newEnergyLevel: updatedResources.energy,
       },
-    };
+    });
 
     gameState.updateProbe(probe.id, {
       resources: updatedResources,
-      memory: {
-        ...probe.memory,
-        experiences: [...probe.memory.experiences, newExperience],
-      },
     });
 
     console.log(
@@ -174,10 +169,52 @@ export const runSimulation = hatchet.task({
               `    Priority: ${agentResult.priority} | Actions: ${agentResult.totalActions}`,
             );
             agentResult.executedActions?.forEach((action: any, idx: number) => {
-              const status = action.error ? "❌" : "✅";
+              // Check actual task result for success/failure
+              const taskResult = action.result;
+              let status = "❌"; // Default to failed
+
+              if (taskResult) {
+                // Handle different result structures
+                if (typeof taskResult === "object") {
+                  // Check if it's a wrapped Hatchet result
+                  const unwrappedResult =
+                    taskResult[action.action] || taskResult;
+
+                  // Debug logging to understand the structure (removed for cleaner output)
+
+                  // Check for success in various formats
+                  if (unwrappedResult?.success === true) {
+                    status = "✅";
+                  } else if (unwrappedResult?.success === false) {
+                    status = "❌";
+                  } else {
+                    // If no explicit success field, assume success if no error
+                    status = action.error ? "❌" : "✅";
+                  }
+                } else {
+                  status = "❌";
+                }
+              }
+
+              // If there's an explicit error, it's definitely failed
+              if (action.error) {
+                status = "❌";
+              }
+
               console.log(
                 `    ${idx + 1}. ${status} ${action.action} - ${action.reasoning}`,
               );
+
+              // Show failure reason if available
+              if (status === "❌" && taskResult) {
+                const unwrappedResult = taskResult[action.action] || taskResult;
+                if (unwrappedResult?.reason) {
+                  console.log(`        Reason: ${unwrappedResult.reason}`);
+                }
+                if (action.error) {
+                  console.log(`        Error: ${action.error}`);
+                }
+              }
             });
           }
         });

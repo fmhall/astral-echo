@@ -29,7 +29,7 @@ export const travelToPosition = hatchet.task({
       input.targetPosition,
     );
     const travelTime = Math.ceil(distance / probe.capabilities.maxSpeed);
-    const energyCost = Math.ceil(distance * 10); // 10 energy per unit distance
+    const energyCost = Math.ceil(distance * 2); // Reduced from 10 to 2 energy per unit distance
 
     if (probe.resources.energy < energyCost) {
       console.log(`[PROBE ${probe.name}] Insufficient energy for travel`);
@@ -55,9 +55,7 @@ export const travelToPosition = hatchet.task({
     });
 
     // Add experience
-    const updatedProbe = gameState.getProbe(input.probeId)!;
-    updatedProbe.memory.experiences.push({
-      timestamp: Date.now(),
+    gameState.addProbeExperience(input.probeId, {
       event: "travel_completed",
       data: {
         fromPosition: probe.position,
@@ -69,7 +67,6 @@ export const travelToPosition = hatchet.task({
     });
 
     gameState.updateProbe(input.probeId, {
-      memory: updatedProbe.memory,
       status: "active",
     });
 
@@ -189,9 +186,7 @@ export const harvestResources = hatchet.task({
     });
 
     // Add experience
-    const updatedProbe = gameState.getProbe(input.probeId)!;
-    updatedProbe.memory.experiences.push({
-      timestamp: Date.now(),
+    gameState.addProbeExperience(input.probeId, {
       event: "resources_harvested",
       data: {
         bodyId: targetBody.id,
@@ -202,7 +197,6 @@ export const harvestResources = hatchet.task({
     });
 
     gameState.updateProbe(input.probeId, {
-      memory: updatedProbe.memory,
       status: "active",
     });
 
@@ -305,8 +299,8 @@ export const manufactureProbe = hatchet.task({
     // Update parent probe memory and status
     const updatedParentProbe = gameState.getProbe(input.probeId)!;
     updatedParentProbe.memory.knownProbes.push(newProbeId);
-    updatedParentProbe.memory.experiences.push({
-      timestamp: Date.now(),
+
+    gameState.addProbeExperience(input.probeId, {
       event: "probe_manufactured",
       data: {
         childId: newProbeId,
@@ -316,7 +310,7 @@ export const manufactureProbe = hatchet.task({
     });
 
     gameState.updateProbe(input.probeId, {
-      memory: updatedParentProbe.memory,
+      memory: updatedParentProbe.memory, // Still need to update knownProbes
       status: "active",
     });
 

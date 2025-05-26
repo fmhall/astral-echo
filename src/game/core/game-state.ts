@@ -104,10 +104,10 @@ class GameStateManager {
           type: "planet",
           position: { x: 150, y: 0, z: 0 }, // 1 AU = 150 million km
           resources: {
-            energy: 0,
+            energy: 2000, // Added energy resources for harvesting
             metal: 5000,
             silicon: 3000,
-            hydrogen: 100,
+            hydrogen: 1000, // Increased hydrogen
             rare_elements: 200,
           },
           mass: 5.972e24,
@@ -119,10 +119,10 @@ class GameStateManager {
           type: "planet",
           position: { x: 230, y: 0, z: 0 },
           resources: {
-            energy: 0,
+            energy: 1500, // Added energy resources for harvesting
             metal: 3000,
             silicon: 6000,
-            hydrogen: 50,
+            hydrogen: 800, // Increased hydrogen
             rare_elements: 100,
           },
           mass: 6.39e23,
@@ -283,11 +283,13 @@ class GameStateManager {
 
   // Utility methods
   calculateDistance(pos1: Position, pos2: Position): number {
-    return Math.sqrt(
+    const distanceInKm = Math.sqrt(
       Math.pow(pos2.x - pos1.x, 2) +
         Math.pow(pos2.y - pos1.y, 2) +
         Math.pow(pos2.z - pos1.z, 2),
     );
+    // Convert from millions of km to AU (1 AU = 150 million km)
+    return distanceInKm / 150;
   }
 
   canAffordResources(available: Resources, cost: Resources): boolean {
@@ -314,6 +316,38 @@ class GameStateManager {
 
   getTotalResourceAmount(resources: Resources): number {
     return Object.values(resources).reduce((sum, amount) => sum + amount, 0);
+  }
+
+  // Add experience to probe memory (DRY helper function)
+  addProbeExperience(
+    probeId: string,
+    experience: {
+      event: string;
+      data?: any;
+      timestamp?: number;
+    },
+  ): void {
+    const probe = this.getProbe(probeId);
+    if (probe) {
+      const newExperience = {
+        timestamp: experience.timestamp || Date.now(),
+        event: experience.event,
+        data: experience.data || {},
+      };
+
+      this.updateProbe(probeId, {
+        memory: {
+          ...probe.memory,
+          experiences: [...probe.memory.experiences, newExperience],
+        },
+      });
+
+      console.log(`📝 [MEMORY] ${probe.name}: ${experience.event} recorded`);
+    } else {
+      console.error(
+        `❌ [MEMORY] Cannot add experience to probe ${probeId} - not found`,
+      );
+    }
   }
 }
 

@@ -162,8 +162,8 @@ export const scanForResources = hatchet.task({
 
     // Update probe memory with discovered resources
     probe.memory.discoveredResources[targetBody.id] = targetBody.resources;
-    probe.memory.experiences.push({
-      timestamp: Date.now(),
+
+    gameState.addProbeExperience(input.probeId, {
       event: "resources_scanned",
       data: {
         bodyId: targetBody.id,

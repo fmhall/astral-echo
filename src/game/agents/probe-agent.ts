@@ -3,6 +3,13 @@ import { z } from "zod";
 import { gameState } from "@/game/core/game-state";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { Context } from "@hatchet-dev/typescript-sdk/v1/client/worker/context";
+
+// Helper function to extract task result from Hatchet's wrapped response
+function getTaskResult(result: any, taskName: string): any {
+  // Hatchet wraps results in an object with the task name as key
+  return result[taskName] || result;
+}
 
 // Utility function for concise task logging
 function logTask(
@@ -11,16 +18,24 @@ function logTask(
   probeName: string,
   parameters: any,
   result?: any,
+  ctx?: InstanceType<typeof Context>,
 ) {
   const timestamp = new Date().toISOString().slice(11, 19); // HH:MM:SS
   const params =
     Object.keys(parameters).length > 0
       ? ` params:${JSON.stringify(parameters)}`
       : "";
-  const resultSummary = result ? ` → ${result.success ? "✅" : "❌"}` : "";
+  const resultSummary = result
+    ? ` → ${getTaskResult(result, taskName)?.success ? "✅" : "❌"}`
+    : "";
   console.log(
     `[${timestamp}] 🔧 ${taskName} | ${probeName}(${probeId.slice(0, 8)})${params}${resultSummary}`,
   );
+  if (ctx) {
+    ctx.logger.info(
+      `[${timestamp}] 🔧 ${taskName} | ${probeName}(${probeId.slice(0, 8)})${params}${resultSummary}`,
+    );
+  }
 }
 
 // Task: Run probe agent
@@ -60,6 +75,7 @@ export const runProbeAgent = hatchet.task({
     const probe = gameState.getProbe(input.probeId);
 
     if (!probe) {
+      ctx.logger.error(`Probe ${input.probeId} not found`);
       throw new Error(`Probe ${input.probeId} not found`);
     }
 

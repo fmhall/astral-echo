@@ -25,7 +25,7 @@ async function debugGameState() {
         probeId: firstProbe.id,
       });
       const result = await stateResult.output;
-      console.log("get-probe-state result:", result);
+      console.log("get-probe-state result:", JSON.stringify(result, null, 2));
     } catch (error) {
       console.error("get-probe-state failed:", error);
     }
@@ -40,7 +40,10 @@ async function debugGameState() {
         },
       );
       const result = await envResult.output;
-      console.log("get-environment-state result:", result);
+      console.log(
+        "get-environment-state result:",
+        JSON.stringify(result, null, 2),
+      );
     } catch (error) {
       console.error("get-environment-state failed:", error);
     }
@@ -53,7 +56,7 @@ async function debugGameState() {
         maxActions: 1,
       });
       const result = await agentResult.output;
-      console.log("run-probe-agent result:", result);
+      console.log("run-probe-agent result:", JSON.stringify(result, null, 2));
     } catch (error) {
       console.error("run-probe-agent failed:", error);
     }

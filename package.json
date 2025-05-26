@@ -9,7 +9,8 @@
     "format": "prettier --write .",
     "start": "dotenv -e .env -- ts-node-dev -r tsconfig-paths/register ./src/game/runner.ts start",
     "status": "dotenv -e .env -- ts-node-dev -r tsconfig-paths/register ./src/game/runner.ts status",
-    "debug": "dotenv -e .env -- ts-node-dev -r tsconfig-paths/register ./src/game/debug-runner.ts debug"
+    "debug": "dotenv -e .env -- ts-node-dev -r tsconfig-paths/register ./src/game/debug-runner.ts debug",
+    "reset": "dotenv -e .env -- ts-node-dev -r tsconfig-paths/register ./src/game/debug-runner.ts reset"
   },
   "dependencies": {
     "@ai-sdk/openai": "^1.3.22",

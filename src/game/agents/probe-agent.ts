@@ -32,13 +32,12 @@ function logTask(
       ? ` params:${JSON.stringify(parameters)}`
       : "";
   const resultSummary = result ? ` → ${result.success ? "✅" : "❌"}` : "";
-  console.log(
-    `[${timestamp}] 🔧 ${taskName} | ${probeName}(${probeId.slice(0, 8)})${params}${resultSummary}`,
-  );
+  const logMessage = `[${timestamp}] 🔧 ${taskName} | ${probeName}(${probeId.slice(0, 8)})${params}${resultSummary}`;
+
   if (ctx) {
-    ctx.logger.info(
-      `[${timestamp}] 🔧 ${taskName} | ${probeName}(${probeId.slice(0, 8)})${params}${resultSummary}`,
-    );
+    ctx.logger.info(logMessage);
+  } else {
+    console.log(logMessage);
   }
 }
 
@@ -103,7 +102,7 @@ export const runProbeAgent = hatchet.task({
       throw new Error(`Probe ${input.probeId} not found`);
     }
 
-    console.log(
+    ctx.logger.info(
       `🤖 [AI AGENT] Analyzing situation for probe ${probe.name} (${probe.id.slice(0, 8)}...)...`,
     );
 
@@ -122,7 +121,7 @@ export const runProbeAgent = hatchet.task({
       const probeData = probeStateResult.data?.probe;
 
       if (!probeData) {
-        console.error(
+        ctx.logger.error(
           `❌ [AI AGENT] No probe data returned from get-probe-state for probe ${input.probeId}`,
         );
         throw new Error(
@@ -131,7 +130,7 @@ export const runProbeAgent = hatchet.task({
       }
 
       if (!environmentData.data) {
-        console.error(
+        ctx.logger.error(
           `❌ [AI AGENT] No environment data returned from get-environment-state for probe ${input.probeId}`,
         );
         throw new Error(
@@ -165,8 +164,10 @@ export const runProbeAgent = hatchet.task({
           ? `Recent failures to avoid repeating: ${recentFailures.join(", ")}`
           : "No recent failures";
 
-      console.log(`🧠 [AI AGENT] ${probe.name} memory: ${memoryContext}`);
-      console.log(`⚠️  [AI AGENT] ${probe.name} failures: ${failureContext}`);
+      ctx.logger.info(`🧠 [AI AGENT] ${probe.name} memory: ${memoryContext}`);
+      ctx.logger.info(
+        `⚠️  [AI AGENT] ${probe.name} failures: ${failureContext}`,
+      );
 
       // Use AI to decide what actions to take
       const { object: decision } = await generateObject({
@@ -279,10 +280,12 @@ export const runProbeAgent = hatchet.task({
         }`,
       });
 
-      console.log(
+      ctx.logger.info(
         `🎯 [AI AGENT] ${probe.name} strategy: ${decision.overallStrategy}`,
       );
-      console.log(`📊 [AI AGENT] ${probe.name} priority: ${decision.priority}`);
+      ctx.logger.info(
+        `📊 [AI AGENT] ${probe.name} priority: ${decision.priority}`,
+      );
 
       const executedActions = [];
 
@@ -293,7 +296,7 @@ export const runProbeAgent = hatchet.task({
         i++
       ) {
         const action = decision.actions[i];
-        console.log(
+        ctx.logger.info(
           `⚡ [AI AGENT] ${probe.name} executing: ${action.action} - ${action.reasoning}`,
         );
 
@@ -447,7 +450,7 @@ export const runProbeAgent = hatchet.task({
 
             case "wait":
               result = { success: true, action: action.action };
-              console.log(`⏸️  [PROBE ${probe.name}] Waiting...`);
+              ctx.logger.info(`⏸️  [PROBE ${probe.name}] Waiting...`);
 
               // Add wait experience to memory
               gameState.addProbeExperience(input.probeId, {
@@ -458,7 +461,7 @@ export const runProbeAgent = hatchet.task({
 
             case "explore_system":
               result = { success: true, action: action.action };
-              console.log(`🔭 [PROBE ${probe.name}] Exploring system...`);
+              ctx.logger.info(`🔭 [PROBE ${probe.name}] Exploring system...`);
 
               // Add exploration experience to memory
               gameState.addProbeExperience(input.probeId, {
@@ -471,7 +474,7 @@ export const runProbeAgent = hatchet.task({
               break;
 
             default:
-              console.log(`❓ [AI AGENT] Unknown action: ${action.action}`);
+              ctx.logger.warn(`❓ [AI AGENT] Unknown action: ${action.action}`);
               continue;
           }
 
@@ -484,9 +487,8 @@ export const runProbeAgent = hatchet.task({
             }),
           );
         } catch (error) {
-          console.error(
-            `❌ [AI AGENT] Error executing ${action.action}:`,
-            error,
+          ctx.logger.error(
+            `❌ [AI AGENT] Error executing ${action.action}: ${error}`,
           );
           logTask(
             action.action,
@@ -519,7 +521,7 @@ export const runProbeAgent = hatchet.task({
       }
 
       const updatedProbe = gameState.getProbe(input.probeId);
-      console.log(
+      ctx.logger.info(
         `✅ [AI AGENT] ${probe.name} completed ${executedActions.length} actions. Energy: ${updatedProbe?.resources.energy || "unknown"}`,
       );
 
@@ -532,9 +534,8 @@ export const runProbeAgent = hatchet.task({
         totalActions: executedActions.length,
       });
     } catch (error) {
-      console.error(
-        `❌ [AI AGENT] Error in probe agent for ${probe.name}:`,
-        error,
+      ctx.logger.error(
+        `❌ [AI AGENT] Error in probe agent for ${probe.name}: ${error}`,
       );
       throw error;
     }

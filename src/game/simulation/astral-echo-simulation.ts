@@ -77,13 +77,13 @@ export type GetSimulationStatusOutput = z.infer<
 >;
 
 // Passive solar energy generation for all probes
-function applySolarCharging() {
+function applySolarCharging(ctx: any) {
   const allProbes = gameState.getAllProbes();
   const activeProbes = allProbes.filter((p) => p.status === "active");
 
   if (activeProbes.length === 0) return;
 
-  console.log(
+  ctx.logger.info(
     `☀️  Applying solar panel charging to ${activeProbes.length} active probes...`,
   );
 
@@ -110,7 +110,7 @@ function applySolarCharging() {
       resources: updatedResources,
     });
 
-    console.log(
+    ctx.logger.info(
       `  ☀️  ${probe.name}: +${solarEnergyGain} energy → ${updatedResources.energy} total`,
     );
   });
@@ -120,11 +120,11 @@ export const runSimulation = hatchet.task({
   name: "run-astral-echo-simulation",
   executionTimeout: "3600s", // 1 hour max
   fn: async (input: z.infer<typeof runSimulationInput>, ctx) => {
-    console.log("🌌 Starting Astral Echo Simulation...");
-    console.log(
+    ctx.logger.info("🌌 Starting Astral Echo Simulation...");
+    ctx.logger.info(
       `⚙️  Configuration: ${input.maxTicks} ticks, ${input.tickDuration}ms between ticks`,
     );
-    console.log(
+    ctx.logger.info(
       `☀️  Solar panels provide +20 energy per tick to all active probes`,
     );
 
@@ -136,29 +136,29 @@ export const runSimulation = hatchet.task({
       tick++;
       const tickStartTime = Date.now();
 
-      console.log(`\n⏱️  === SIMULATION TICK ${tick} ===`);
+      ctx.logger.info(`\n⏱️  === SIMULATION TICK ${tick} ===`);
 
       // Apply passive solar charging at the start of each tick
-      applySolarCharging();
+      applySolarCharging(ctx);
 
       // Get fresh probe data each tick to avoid stale IDs
       const allProbes = gameState.getAllProbes();
       const activeProbes = allProbes.filter((p) => p.status !== "destroyed");
 
-      console.log(
+      ctx.logger.info(
         `🛸 Active Probes: ${activeProbes.length} | 🌟 Solar Systems: ${gameState.getAllSystems().length}`,
       );
 
       // Show probe status summary
       if (activeProbes.length > 0) {
-        console.log(`📊 Probe Status Summary:`);
+        ctx.logger.info(`📊 Probe Status Summary:`);
         activeProbes.forEach((probe) => {
           const recentAction =
             probe.memory.experiences.length > 0
               ? probe.memory.experiences[probe.memory.experiences.length - 1]
                   .event
               : "none";
-          console.log(
+          ctx.logger.info(
             `  • ${probe.name} (Gen ${probe.generation}): E:${probe.resources.energy} M:${probe.resources.metal} S:${probe.resources.silicon} H:${probe.resources.hydrogen} R:${probe.resources.rare_elements} | Last: ${recentAction}`,
           );
         });
@@ -168,14 +168,14 @@ export const runSimulation = hatchet.task({
       const probePromises = activeProbes.map(
         async (probe): Promise<ProbeExecutionResult> => {
           try {
-            console.log(
+            ctx.logger.info(
               `🤖 Starting AI agent for ${probe.name} (${probe.id.slice(0, 8)}...)`,
             );
 
             // Double-check probe still exists before running agent
             const currentProbe = gameState.getProbe(probe.id);
             if (!currentProbe) {
-              console.error(
+              ctx.logger.error(
                 `❌ Probe ${probe.name} (${probe.id}) disappeared before agent run!`,
               );
               return {
@@ -191,7 +191,7 @@ export const runSimulation = hatchet.task({
               maxActions: 3,
             });
 
-            console.log(`✅ AI agent completed for ${probe.name}`);
+            ctx.logger.info(`✅ AI agent completed for ${probe.name}`);
 
             return {
               probeId: probe.id,
@@ -200,9 +200,8 @@ export const runSimulation = hatchet.task({
               result,
             };
           } catch (error) {
-            console.error(
-              `❌ Error running probe ${probe.name} (${probe.id.slice(0, 8)}...):`,
-              error,
+            ctx.logger.error(
+              `❌ Error running probe ${probe.name} (${probe.id.slice(0, 8)}...): ${error}`,
             );
             return {
               probeId: probe.id,
@@ -221,20 +220,20 @@ export const runSimulation = hatchet.task({
       const successfulProbes = probeResults.filter((r) => r.success);
       const failedProbes = probeResults.filter((r) => !r.success);
 
-      console.log(`\n📈 === TICK ${tick} RESULTS ===`);
-      console.log(
+      ctx.logger.info(`\n📈 === TICK ${tick} RESULTS ===`);
+      ctx.logger.info(
         `✅ Successful: ${successfulProbes.length} probes | ❌ Failed: ${failedProbes.length} probes`,
       );
 
       // Show detailed probe results
       if (successfulProbes.length > 0) {
-        console.log(`\n🎯 Successful Probe Actions:`);
+        ctx.logger.info(`\n🎯 Successful Probe Actions:`);
         successfulProbes.forEach((agentResult) => {
           if (agentResult.result) {
-            console.log(
+            ctx.logger.info(
               `  • ${agentResult.probeName}: ${agentResult.result.overallStrategy}`,
             );
-            console.log(
+            ctx.logger.info(
               `    Priority: ${agentResult.result.priority} | Actions: ${agentResult.result.totalActions}`,
             );
             agentResult.result.executedActions.forEach(
@@ -243,12 +242,12 @@ export const runSimulation = hatchet.task({
                 const taskResult = action.result;
                 let status = taskResult?.success ? "✅" : "❌"; // Default to failed
 
-                console.log(
+                ctx.logger.info(
                   `    ${idx + 1}. ${status} ${action.action} - ${action.reasoning}`,
                 );
 
                 if (taskResult?.error?.reason) {
-                  console.log(`        Reason: ${taskResult.error.reason}`);
+                  ctx.logger.info(`        Reason: ${taskResult.error.reason}`);
                 }
               },
             );
@@ -258,9 +257,9 @@ export const runSimulation = hatchet.task({
 
       // Show failed probe details
       if (failedProbes.length > 0) {
-        console.log(`\n💥 Failed Probes:`);
+        ctx.logger.warn(`\n💥 Failed Probes:`);
         failedProbes.forEach((fp) => {
-          console.log(
+          ctx.logger.warn(
             `  • ${fp.probeName} (${fp.probeId.slice(0, 8)}...): ${fp.error}`,
           );
         });
@@ -271,9 +270,9 @@ export const runSimulation = hatchet.task({
         .getAllProbes()
         .filter((p) => p.status !== "destroyed");
       if (updatedProbes.length > 0) {
-        console.log(`\n🔄 Post-Tick Probe States:`);
+        ctx.logger.info(`\n🔄 Post-Tick Probe States:`);
         updatedProbes.forEach((probe) => {
-          console.log(
+          ctx.logger.info(
             `  • ${probe.name}: E:${probe.resources.energy} M:${probe.resources.metal} S:${probe.resources.silicon} H:${probe.resources.hydrogen} R:${probe.resources.rare_elements}`,
           );
         });
@@ -291,17 +290,21 @@ export const runSimulation = hatchet.task({
 
       executionLog.push(tickData);
 
-      console.log(`\n⏱️  Tick ${tick} completed in ${tickData.tickDuration}ms`);
+      ctx.logger.info(
+        `\n⏱️  Tick ${tick} completed in ${tickData.tickDuration}ms`,
+      );
 
       // Check if we should continue (all probes destroyed)
       if (activeProbes.length === 0) {
-        console.log("🔚 All probes destroyed. Simulation ending.");
+        ctx.logger.warn("🔚 All probes destroyed. Simulation ending.");
         break;
       }
 
       // Add a delay between ticks if configured
       if (input.tickDuration > 0 && tick < input.maxTicks) {
-        console.log(`⏳ Waiting ${input.tickDuration}ms until next tick...\n`);
+        ctx.logger.info(
+          `⏳ Waiting ${input.tickDuration}ms until next tick...\n`,
+        );
         await new Promise((resolve) => setTimeout(resolve, input.tickDuration));
       }
     }
@@ -321,12 +324,14 @@ export const runSimulation = hatchet.task({
       executionLog,
     };
 
-    console.log("\n🎯 === SIMULATION COMPLETE ===");
-    console.log(`🕐 Total time: ${(totalSimulationTime / 1000).toFixed(1)}s`);
-    console.log(`⚡ Total ticks: ${tick}`);
-    console.log(`🛸 Final probe count: ${finalReport.finalProbeCount}`);
-    console.log(`🌟 Systems discovered: ${finalReport.finalSystemCount}`);
-    console.log(`🧬 Maximum generation: ${finalReport.generations}`);
+    ctx.logger.info("\n🎯 === SIMULATION COMPLETE ===");
+    ctx.logger.info(
+      `🕐 Total time: ${(totalSimulationTime / 1000).toFixed(1)}s`,
+    );
+    ctx.logger.info(`⚡ Total ticks: ${tick}`);
+    ctx.logger.info(`🛸 Final probe count: ${finalReport.finalProbeCount}`);
+    ctx.logger.info(`🌟 Systems discovered: ${finalReport.finalSystemCount}`);
+    ctx.logger.info(`🧬 Maximum generation: ${finalReport.generations}`);
 
     return runSimulationOutput.parse({
       success: true,
@@ -342,7 +347,7 @@ export const getSimulationStatusInput = z.object({});
 export const getSimulationStatus = hatchet.task({
   name: "get-simulation-status",
   executionTimeout: "10s",
-  fn: async (input: z.infer<typeof getSimulationStatusInput>) => {
+  fn: async (input: z.infer<typeof getSimulationStatusInput>, ctx) => {
     const state = gameState.getState();
     const allProbes = gameState.getAllProbes();
     const allSystems = gameState.getAllSystems();
@@ -377,12 +382,12 @@ export const getSimulationStatus = hatchet.task({
       },
     );
 
-    console.log("\n📊 === SIMULATION STATUS ===");
-    console.log(`🛸 Total Probes: ${allProbes.length}`);
-    console.log(`🌟 Solar Systems: ${allSystems.length}`);
-    console.log(`🧬 Generation Distribution:`, generationStats);
-    console.log(`⚙️ Status Distribution:`, statusStats);
-    console.log(`💎 Total Resources:`, totalResources);
+    ctx.logger.info("\n📊 === SIMULATION STATUS ===");
+    ctx.logger.info(`🛸 Total Probes: ${allProbes.length}`);
+    ctx.logger.info(`🌟 Solar Systems: ${allSystems.length}`);
+    ctx.logger.info(`🧬 Generation Distribution:`, generationStats);
+    ctx.logger.info(`⚙️ Status Distribution:`, statusStats);
+    ctx.logger.info(`💎 Total Resources:`, totalResources);
 
     const statusData = {
       timestamp: Date.now(),

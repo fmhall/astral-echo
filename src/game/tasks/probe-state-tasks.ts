@@ -22,14 +22,14 @@ export const getProbeStateOutput = BaseTaskOutputSchema(
 export const getProbeState = hatchet.task({
   name: "get-probe-state",
   executionTimeout: "10s",
-  fn: async (input: z.infer<typeof getProbeStateInput>) => {
+  fn: async (input: z.infer<typeof getProbeStateInput>, ctx) => {
     const probe = gameState.getProbe(input.probeId);
 
     if (!probe) {
       throw new Error(`Probe ${input.probeId} not found`);
     }
 
-    console.log(
+    ctx.logger.info(
       `[PROBE ${probe.name}] Status: ${probe.status}, Energy: ${probe.resources.energy}`,
     );
 
@@ -65,7 +65,7 @@ export const getEnvironmentStateOutput = BaseTaskOutputSchema(
 export const getEnvironmentState = hatchet.task({
   name: "get-environment-state",
   executionTimeout: "10s",
-  fn: async (input: z.infer<typeof getEnvironmentStateInput>) => {
+  fn: async (input: z.infer<typeof getEnvironmentStateInput>, ctx) => {
     const probe = gameState.getProbe(input.probeId);
 
     if (!probe) {
@@ -88,7 +88,7 @@ export const getEnvironmentState = hatchet.task({
 
     const closestBody = nearbyBodies[0];
 
-    console.log(
+    ctx.logger.info(
       `[PROBE ${probe.name}] Nearest body: ${closestBody.body.name} at ${closestBody.distance.toFixed(1)} AU`,
     );
 
@@ -121,7 +121,7 @@ export const getSolarSystemStateOutput = BaseTaskOutputSchema(
 export const getSolarSystemState = hatchet.task({
   name: "get-solar-system-state",
   executionTimeout: "10s",
-  fn: async (input: z.infer<typeof getSolarSystemStateInput>) => {
+  fn: async (input: z.infer<typeof getSolarSystemStateInput>, ctx) => {
     const system = gameState.getSolarSystem(input.systemId);
 
     if (!system) {
@@ -171,7 +171,7 @@ export const scanForResourcesOutput = BaseTaskOutputSchema(
 export const scanForResources = hatchet.task({
   name: "scan-for-resources",
   executionTimeout: "10s",
-  fn: async (input: z.infer<typeof scanForResourcesInput>) => {
+  fn: async (input: z.infer<typeof scanForResourcesInput>, ctx) => {
     const probe = gameState.getProbe(input.probeId);
 
     if (!probe) {
@@ -198,7 +198,7 @@ export const scanForResources = hatchet.task({
     );
 
     if (distance > probe.capabilities.sensorRange) {
-      console.log(
+      ctx.logger.warn(
         `[PROBE ${probe.name}] Target ${targetBody.name} is out of sensor range`,
       );
       return scanForResourcesOutput.parse({
@@ -224,7 +224,7 @@ export const scanForResources = hatchet.task({
 
     gameState.updateProbe(input.probeId, { memory: probe.memory });
 
-    console.log(
+    ctx.logger.info(
       `[PROBE ${probe.name}] Scanned ${targetBody.name}: ${JSON.stringify(targetBody.resources)}`,
     );
 

@@ -72,8 +72,8 @@ type PickInput = {
 const pick = hatchet.task({
   name: "pick",
   executionTimeout: "5m",
-  fn: async (input: PickInput) => {
-    console.log(JSON.stringify(input.toolset, null, 2));
+  fn: async (input: PickInput, ctx) => {
+    ctx.logger.info(JSON.stringify(input.toolset, null, 2));
     const { steps } = await generateText({
       model: openai("gpt-4.1-mini"),
       tools: input.toolset,

@@ -27,7 +27,7 @@ export const travelToPositionOutput = BaseTaskOutputSchema(
 export const travelToPosition = hatchet.task({
   name: "travel-to-position",
   executionTimeout: "30s",
-  fn: async (input: z.infer<typeof travelToPositionInput>) => {
+  fn: async (input: z.infer<typeof travelToPositionInput>, ctx) => {
     const probe = gameState.getProbe(input.probeId);
 
     if (!probe) {
@@ -42,7 +42,7 @@ export const travelToPosition = hatchet.task({
     const energyCost = Math.ceil(distance * 2); // Reduced from 10 to 2 energy per unit distance
 
     if (probe.resources.energy < energyCost) {
-      console.log(`[PROBE ${probe.name}] Insufficient energy for travel`);
+      ctx.logger.warn(`[PROBE ${probe.name}] Insufficient energy for travel`);
       return travelToPositionOutput.parse({
         success: false,
         data: null,
@@ -81,7 +81,7 @@ export const travelToPosition = hatchet.task({
       status: "active",
     });
 
-    console.log(
+    ctx.logger.info(
       `[PROBE ${probe.name}] Traveled ${distance.toFixed(1)} AU to (${input.targetPosition.x}, ${input.targetPosition.y}, ${input.targetPosition.z})`,
     );
 
@@ -116,7 +116,7 @@ export const harvestResourcesOutput = BaseTaskOutputSchema(
 export const harvestResources = hatchet.task({
   name: "harvest-resources",
   executionTimeout: "60s",
-  fn: async (input: z.infer<typeof harvestResourcesInput>) => {
+  fn: async (input: z.infer<typeof harvestResourcesInput>, ctx) => {
     const probe = gameState.getProbe(input.probeId);
 
     if (!probe) {
@@ -144,7 +144,7 @@ export const harvestResources = hatchet.task({
 
     if (distance > 1.0) {
       // Must be very close to harvest
-      console.log(
+      ctx.logger.warn(
         `[PROBE ${probe.name}] Too far from ${targetBody.name} to harvest`,
       );
       return harvestResourcesOutput.parse({
@@ -174,7 +174,7 @@ export const harvestResources = hatchet.task({
     const currentTotal = gameState.getTotalResourceAmount(probe.resources);
 
     if (currentTotal + totalHarvested > probe.capabilities.storageCapacity) {
-      console.log(`[PROBE ${probe.name}] Storage capacity exceeded`);
+      ctx.logger.warn(`[PROBE ${probe.name}] Storage capacity exceeded`);
       return harvestResourcesOutput.parse({
         success: false,
         data: null,
@@ -224,7 +224,7 @@ export const harvestResources = hatchet.task({
       status: "active",
     });
 
-    console.log(
+    ctx.logger.info(
       `[PROBE ${probe.name}] Harvested from ${targetBody.name}: ${JSON.stringify(actualHarvest)}`,
     );
 
@@ -258,7 +258,7 @@ export const manufactureProbeOutput = BaseTaskOutputSchema(
 export const manufactureProbe = hatchet.task({
   name: "manufacture-probe",
   executionTimeout: "120s",
-  fn: async (input: z.infer<typeof manufactureProbeInput>) => {
+  fn: async (input: z.infer<typeof manufactureProbeInput>, ctx) => {
     const parentProbe = gameState.getProbe(input.probeId);
 
     if (!parentProbe) {
@@ -272,7 +272,7 @@ export const manufactureProbe = hatchet.task({
         PROBE_REPLICATION_COST,
       )
     ) {
-      console.log(
+      ctx.logger.warn(
         `[PROBE ${parentProbe.name}] Insufficient resources for replication`,
       );
       return manufactureProbeOutput.parse({
@@ -351,7 +351,7 @@ export const manufactureProbe = hatchet.task({
       status: "active",
     });
 
-    console.log(
+    ctx.logger.info(
       `[PROBE ${parentProbe.name}] Manufactured new probe: ${input.newProbeName} (Generation ${newProbe.generation})`,
     );
 

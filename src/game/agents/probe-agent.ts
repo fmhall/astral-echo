@@ -4,12 +4,18 @@ import { gameState } from "@/game/core/game-state";
 import { generateObject } from "ai";
 import { openai } from "@ai-sdk/openai";
 import { Context } from "@hatchet-dev/typescript-sdk/v1/client/worker/context";
-
-// Helper function to extract task result from Hatchet's wrapped response
-function getTaskResult(result: any, taskName: string): any {
-  // Hatchet wraps results in an object with the task name as key
-  return result[taskName] || result;
-}
+import {
+  getProbeState,
+  getEnvironmentState,
+  getSolarSystemState,
+  scanForResources,
+} from "@/game/tasks/probe-state-tasks";
+import {
+  travelToPosition,
+  harvestResources,
+  manufactureProbe,
+} from "@/game/tasks/probe-action-tasks";
+import { BaseTaskOutputSchema } from "../core/types";
 
 // Utility function for concise task logging
 function logTask(
@@ -25,9 +31,7 @@ function logTask(
     Object.keys(parameters).length > 0
       ? ` params:${JSON.stringify(parameters)}`
       : "";
-  const resultSummary = result
-    ? ` → ${getTaskResult(result, taskName)?.success ? "✅" : "❌"}`
-    : "";
+  const resultSummary = result ? ` → ${result.success ? "✅" : "❌"}` : "";
   console.log(
     `[${timestamp}] 🔧 ${taskName} | ${probeName}(${probeId.slice(0, 8)})${params}${resultSummary}`,
   );
@@ -44,16 +48,18 @@ export const runProbeAgentInput = z.object({
   maxActions: z.number().min(1).max(10).default(3), // Maximum actions to take in this run
 });
 
-const ProbeActionSchema = z.object({
-  action: z.enum([
-    "scan_resources",
-    "travel_to_body",
-    "harvest_resources",
-    "manufacture_probe",
-    "explore_system",
-    "wait",
-  ]),
-  parameters: z.record(z.any()).optional(),
+export const ProbeAction = z.enum([
+  "scan_resources",
+  "travel_to_body",
+  "harvest_resources",
+  "manufacture_probe",
+  "explore_system",
+  "wait",
+]);
+
+export const ProbeActionSchema = z.object({
+  action: ProbeAction,
+  parameters: z.record(z.any()),
   reasoning: z.string(),
 });
 
@@ -66,6 +72,24 @@ const ProbeDecisionSchema = z.object({
     "exploration",
     "resource_gathering",
   ]),
+});
+
+export const ExecutedActionSchema = ProbeActionSchema.extend({
+  result: BaseTaskOutputSchema(z.any()).nullable(),
+});
+
+export const ProbeAgentOutputSchema = z.object({
+  probeId: z.string(),
+  probeName: z.string(),
+  overallStrategy: z.string(),
+  priority: z.enum([
+    "survival",
+    "expansion",
+    "exploration",
+    "resource_gathering",
+  ]),
+  executedActions: z.array(ExecutedActionSchema),
+  totalActions: z.number(),
 });
 
 export const runProbeAgent = hatchet.task({
@@ -86,20 +110,16 @@ export const runProbeAgent = hatchet.task({
     try {
       // Get current state information
       logTask("get-probe-state", input.probeId, probe.name, {});
-      const probeStateResult = await ctx.runChild("get-probe-state", {
+      const probeStateResult = await ctx.runChild(getProbeState, {
         probeId: input.probeId,
       });
 
       logTask("get-environment-state", input.probeId, probe.name, {});
-      const environmentResult = await ctx.runChild("get-environment-state", {
+      const environmentData = await ctx.runChild(getEnvironmentState, {
         probeId: input.probeId,
       });
 
-      // Extract probe data from result with correct path
-      const probeData = (probeStateResult as any)["get-probe-state"]?.probe;
-      const environmentData = (environmentResult as any)[
-        "get-environment-state"
-      ];
+      const probeData = probeStateResult.data?.probe;
 
       if (!probeData) {
         console.error(
@@ -110,7 +130,7 @@ export const runProbeAgent = hatchet.task({
         );
       }
 
-      if (!environmentData) {
+      if (!environmentData.data) {
         console.error(
           `❌ [AI AGENT] No environment data returned from get-environment-state for probe ${input.probeId}`,
         );
@@ -135,7 +155,7 @@ export const runProbeAgent = hatchet.task({
         )
         .map((e: any) => {
           if (e.data && e.data.result) {
-            return `${e.event}: ${e.data.result.reason || "unknown reason"}`;
+            return `${e.event}: ${e.data.result.error?.reason || "unknown reason"}`;
           }
           return e.event;
         });
@@ -150,7 +170,7 @@ export const runProbeAgent = hatchet.task({
 
       // Use AI to decide what actions to take
       const { object: decision } = await generateObject({
-        model: openai("gpt-4o-mini"),
+        model: openai("gpt-4.1-mini"),
         schema: ProbeDecisionSchema,
         system: `You are an advanced AI controlling a self-replicating space probe in the Astral Echo simulation.
         
@@ -208,9 +228,9 @@ export const runProbeAgent = hatchet.task({
         - Position: (${probeData.position.x}, ${probeData.position.y}, ${probeData.position.z})
         
         Environment:
-        - Current System: ${environmentData.currentSystem.name}
-        - Nearest Body: ${environmentData.closestBody.name} (${environmentData.distanceToClosest.toFixed(1)} AU)
-        - Available Bodies: ${environmentData.nearbyBodies.map((b: any) => `${b.body.name} (ID: ${b.body.id}, ${b.distance.toFixed(1)} AU, ~${Math.ceil(b.distance * 2)} energy to travel, Type: ${b.body.type})`).join(", ")}
+        - Current System: ${environmentData.data.currentSystem.name}
+        - Nearest Body: ${environmentData.data.closestBody.name} (${environmentData.data.distanceToClosest.toFixed(1)} AU)
+        - Available Bodies: ${environmentData.data.nearbyBodies.map((b: any) => `${b.body.name} (ID: ${b.body.id}, ${b.distance.toFixed(1)} AU, ~${Math.ceil(b.distance * 2)} energy to travel, Type: ${b.body.type})`).join(", ")}
         
         Memory & Recent Actions:
         - ${memoryContext}
@@ -228,7 +248,6 @@ export const runProbeAgent = hatchet.task({
         - Energy harvesting from celestial bodies provides much larger amounts (50+ per action)
         - Travel costs: 2 energy per unit distance (much cheaper than before!)
         - Consider energy management: you gain 20 energy per turn automatically
-        - Current distance to Sol Prime II: ~80 units = ~160 energy cost to travel there
         
         Available Actions (with required parameters):
         - scan_resources: Scan a celestial body for resources {"bodyId": "specific_body_id"}
@@ -251,7 +270,7 @@ export const runProbeAgent = hatchet.task({
           "actions": [
             {
               "action": "harvest_resources",
-              "parameters": {"bodyId": "${environmentData.nearbyBodies[0]?.body?.id || "example-id"}", "duration": 5},
+              "parameters": {"bodyId": "${environmentData.data.nearbyBodies[0]?.body?.id || "example-id"}", "duration": 5},
               "reasoning": "Harvest resources from the scanned body"
             }
           ],
@@ -291,7 +310,7 @@ export const runProbeAgent = hatchet.task({
                   probe.name,
                   params,
                 );
-                result = await ctx.runChild("scan-for-resources", {
+                result = await ctx.runChild(scanForResources, {
                   probeId: input.probeId,
                   targetBodyId: params.bodyId,
                 });
@@ -302,17 +321,12 @@ export const runProbeAgent = hatchet.task({
                   params,
                   result,
                 );
-
-                // Add scan experience to memory
-                const scanResult = getTaskResult(result, "scan-for-resources");
-                gameState.addProbeExperience(input.probeId, {
-                  event: "scanned_body",
-                  data: {
-                    bodyId: params.bodyId,
-                    result: scanResult,
-                    success: scanResult?.success || false,
-                  },
-                });
+                if (!result.success) {
+                  gameState.addProbeExperience(input.probeId, {
+                    event: "scan_resources_failed",
+                    data: { bodyId: params.bodyId, result: result },
+                  });
+                }
               }
               break;
 
@@ -327,7 +341,7 @@ export const runProbeAgent = hatchet.task({
                   logTask("travel-to-position", input.probeId, probe.name, {
                     bodyId: params.bodyId,
                   });
-                  result = await ctx.runChild("travel-to-position", {
+                  result = await ctx.runChild(travelToPosition, {
                     probeId: input.probeId,
                     targetPosition: targetBody.position,
                   });
@@ -339,21 +353,15 @@ export const runProbeAgent = hatchet.task({
                     result,
                   );
 
-                  // Only record travel failures at agent level (successes are recorded by task)
-                  const travelResult = getTaskResult(
-                    result,
-                    "travel-to-position",
-                  );
-
-                  if (!travelResult?.success) {
+                  if (!result.success) {
                     gameState.addProbeExperience(input.probeId, {
                       event: "travel_failed",
                       data: {
                         targetBodyId: params.bodyId,
                         targetBodyName: targetBody.name,
-                        result: travelResult,
+                        result,
                         success: false,
-                        reason: travelResult?.reason,
+                        reason: result.error?.reason,
                       },
                     });
                   }
@@ -363,8 +371,15 @@ export const runProbeAgent = hatchet.task({
 
             case "harvest_resources":
               if (params.bodyId && params.duration) {
-                logTask("harvest-resources", input.probeId, probe.name, params);
-                result = await ctx.runChild("harvest-resources", {
+                logTask(
+                  "harvest-resources",
+                  input.probeId,
+                  probe.name,
+                  params,
+                  undefined,
+                  ctx,
+                );
+                result = await ctx.runChild(harvestResources, {
                   probeId: input.probeId,
                   targetBodyId: params.bodyId,
                   duration: params.duration,
@@ -375,22 +390,18 @@ export const runProbeAgent = hatchet.task({
                   probe.name,
                   params,
                   result,
+                  ctx,
                 );
 
-                // Only record harvest failures at agent level (successes are recorded by task)
-                const harvestResult = getTaskResult(
-                  result,
-                  "harvest-resources",
-                );
-                if (!harvestResult?.success) {
+                if (!result.success) {
                   gameState.addProbeExperience(input.probeId, {
                     event: "harvest_failed",
                     data: {
                       bodyId: params.bodyId,
                       duration: params.duration,
-                      result: harvestResult,
+                      result,
                       success: false,
-                      reason: harvestResult?.reason,
+                      reason: result.error?.reason,
                     },
                   });
                 }
@@ -399,8 +410,15 @@ export const runProbeAgent = hatchet.task({
 
             case "manufacture_probe":
               if (params.newProbeName) {
-                logTask("manufacture-probe", input.probeId, probe.name, params);
-                result = await ctx.runChild("manufacture-probe", {
+                logTask(
+                  "manufacture-probe",
+                  input.probeId,
+                  probe.name,
+                  params,
+                  undefined,
+                  ctx,
+                );
+                result = await ctx.runChild(manufactureProbe, {
                   probeId: input.probeId,
                   newProbeName: params.newProbeName,
                 });
@@ -410,22 +428,17 @@ export const runProbeAgent = hatchet.task({
                   probe.name,
                   params,
                   result,
+                  ctx,
                 );
 
-                // Only record manufacturing failures at agent level (successes are recorded by task)
-                const manufactureResult = getTaskResult(
-                  result,
-                  "manufacture-probe",
-                );
-
-                if (!manufactureResult?.success) {
+                if (!result.success) {
                   gameState.addProbeExperience(input.probeId, {
                     event: "manufacturing_failed",
                     data: {
                       newProbeName: params.newProbeName,
-                      result: manufactureResult,
+                      result,
                       success: false,
-                      reason: manufactureResult?.reason,
+                      reason: result.error?.reason,
                     },
                   });
                 }
@@ -462,12 +475,14 @@ export const runProbeAgent = hatchet.task({
               continue;
           }
 
-          executedActions.push({
-            action: action.action,
-            parameters: params,
-            reasoning: action.reasoning,
-            result,
-          });
+          executedActions.push(
+            ExecutedActionSchema.parse({
+              action: action.action,
+              parameters: params,
+              reasoning: action.reasoning,
+              result,
+            }),
+          );
         } catch (error) {
           console.error(
             `❌ [AI AGENT] Error executing ${action.action}:`,
@@ -482,14 +497,24 @@ export const runProbeAgent = hatchet.task({
               success: false,
               error: error instanceof Error ? error.message : String(error),
             },
+            ctx,
           );
 
-          executedActions.push({
-            action: action.action,
-            parameters: action.parameters,
-            reasoning: action.reasoning,
-            error: error instanceof Error ? error.message : String(error),
-          });
+          executedActions.push(
+            ExecutedActionSchema.parse({
+              action: action.action,
+              parameters: action.parameters,
+              reasoning: action.reasoning,
+              result: {
+                success: false,
+                error: {
+                  reason:
+                    error instanceof Error ? error.message : String(error),
+                },
+                data: null,
+              },
+            }),
+          );
         }
       }
 
@@ -498,14 +523,14 @@ export const runProbeAgent = hatchet.task({
         `✅ [AI AGENT] ${probe.name} completed ${executedActions.length} actions. Energy: ${updatedProbe?.resources.energy || "unknown"}`,
       );
 
-      return {
+      return ProbeAgentOutputSchema.parse({
         probeId: input.probeId,
         probeName: probe.name,
         overallStrategy: decision.overallStrategy,
         priority: decision.priority,
         executedActions,
         totalActions: executedActions.length,
-      };
+      });
     } catch (error) {
       console.error(
         `❌ [AI AGENT] Error in probe agent for ${probe.name}:`,

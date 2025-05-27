@@ -27,7 +27,6 @@ const main = async () => {
 
   // Initialize game state in the worker process
   console.log("🎮 Initializing game state in worker process...");
-  const initialState = gameState.getState();
   const allProbes = gameState.getAllProbes();
 
   console.log(`🛸 Initialized with ${allProbes.length} probes:`);

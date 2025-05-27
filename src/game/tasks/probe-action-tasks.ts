@@ -5,6 +5,7 @@ import {
   PositionSchema,
   PROBE_REPLICATION_COST,
   BASE_PROBE_CAPABILITIES,
+  BaseTaskOutputSchema,
 } from "@/game/core/types";
 import { v4 as uuidv4 } from "uuid";
 
@@ -13,6 +14,15 @@ export const travelToPositionInput = z.object({
   probeId: z.string(),
   targetPosition: PositionSchema,
 });
+
+export const travelToPositionOutput = BaseTaskOutputSchema(
+  z.object({
+    distance: z.number(),
+    energyUsed: z.number(),
+    travelTime: z.number(),
+    newPosition: PositionSchema,
+  }),
+);
 
 export const travelToPosition = hatchet.task({
   name: "travel-to-position",
@@ -33,12 +43,13 @@ export const travelToPosition = hatchet.task({
 
     if (probe.resources.energy < energyCost) {
       console.log(`[PROBE ${probe.name}] Insufficient energy for travel`);
-      return {
+      return travelToPositionOutput.parse({
         success: false,
-        reason: "insufficient_energy",
-        requiredEnergy: energyCost,
-        availableEnergy: probe.resources.energy,
-      };
+        data: null,
+        error: {
+          reason: `insufficient_energy, required ${energyCost} energy, available ${probe.resources.energy}`,
+        },
+      });
     }
 
     // Update probe status and position
@@ -74,13 +85,16 @@ export const travelToPosition = hatchet.task({
       `[PROBE ${probe.name}] Traveled ${distance.toFixed(1)} AU to (${input.targetPosition.x}, ${input.targetPosition.y}, ${input.targetPosition.z})`,
     );
 
-    return {
+    return travelToPositionOutput.parse({
       success: true,
-      distance,
-      energyUsed: energyCost,
-      travelTime,
-      newPosition: input.targetPosition,
-    };
+      data: {
+        distance,
+        energyUsed: energyCost,
+        travelTime,
+        newPosition: input.targetPosition,
+      },
+      error: null,
+    });
   },
 });
 
@@ -90,6 +104,14 @@ export const harvestResourcesInput = z.object({
   targetBodyId: z.string(),
   duration: z.number().min(1).max(100), // harvesting cycles
 });
+
+export const harvestResourcesOutput = BaseTaskOutputSchema(
+  z.object({
+    harvestedResources: z.record(z.any()),
+    duration: z.number(),
+    remainingOnBody: z.record(z.any()),
+  }),
+);
 
 export const harvestResources = hatchet.task({
   name: "harvest-resources",
@@ -125,12 +147,13 @@ export const harvestResources = hatchet.task({
       console.log(
         `[PROBE ${probe.name}] Too far from ${targetBody.name} to harvest`,
       );
-      return {
+      return harvestResourcesOutput.parse({
         success: false,
-        reason: "too_far",
-        distance,
-        maxDistance: 1.0,
-      };
+        data: null,
+        error: {
+          reason: `too_far, max distance is 1.0, distance is ${distance}`,
+        },
+      });
     }
 
     // Calculate harvested amount
@@ -152,12 +175,13 @@ export const harvestResources = hatchet.task({
 
     if (currentTotal + totalHarvested > probe.capabilities.storageCapacity) {
       console.log(`[PROBE ${probe.name}] Storage capacity exceeded`);
-      return {
+      return harvestResourcesOutput.parse({
         success: false,
-        reason: "storage_full",
-        currentStorage: currentTotal,
-        maxStorage: probe.capabilities.storageCapacity,
-      };
+        data: null,
+        error: {
+          reason: `storage_full, current storage is ${currentTotal}, max storage is ${probe.capabilities.storageCapacity}`,
+        },
+      });
     }
 
     // Update probe resources and body resources
@@ -204,12 +228,15 @@ export const harvestResources = hatchet.task({
       `[PROBE ${probe.name}] Harvested from ${targetBody.name}: ${JSON.stringify(actualHarvest)}`,
     );
 
-    return {
+    return harvestResourcesOutput.parse({
       success: true,
-      harvestedResources: actualHarvest,
-      duration: input.duration,
-      remainingOnBody: updatedBody.resources,
-    };
+      data: {
+        harvestedResources: actualHarvest,
+        duration: input.duration,
+        remainingOnBody: updatedBody.resources,
+      },
+      error: null,
+    });
   },
 });
 
@@ -218,6 +245,15 @@ export const manufactureProbeInput = z.object({
   probeId: z.string(),
   newProbeName: z.string(),
 });
+
+export const manufactureProbeOutput = BaseTaskOutputSchema(
+  z.object({
+    newProbeId: z.string(),
+    newProbeName: z.string(),
+    generation: z.number(),
+    resourcesUsed: z.record(z.any()),
+  }),
+);
 
 export const manufactureProbe = hatchet.task({
   name: "manufacture-probe",
@@ -239,12 +275,13 @@ export const manufactureProbe = hatchet.task({
       console.log(
         `[PROBE ${parentProbe.name}] Insufficient resources for replication`,
       );
-      return {
+      return manufactureProbeOutput.parse({
         success: false,
-        reason: "insufficient_resources",
-        required: PROBE_REPLICATION_COST,
-        available: parentProbe.resources,
-      };
+        data: null,
+        error: {
+          reason: `insufficient_resources, required ${JSON.stringify(PROBE_REPLICATION_COST)}, available ${JSON.stringify(parentProbe.resources)}`,
+        },
+      });
     }
 
     // Create new probe
@@ -318,12 +355,15 @@ export const manufactureProbe = hatchet.task({
       `[PROBE ${parentProbe.name}] Manufactured new probe: ${input.newProbeName} (Generation ${newProbe.generation})`,
     );
 
-    return {
+    return manufactureProbeOutput.parse({
       success: true,
-      newProbeId,
-      newProbeName: input.newProbeName,
-      generation: newProbe.generation,
-      resourcesUsed: PROBE_REPLICATION_COST,
-    };
+      data: {
+        newProbeId,
+        newProbeName: input.newProbeName,
+        generation: newProbe.generation,
+        resourcesUsed: PROBE_REPLICATION_COST,
+      },
+      error: null,
+    });
   },
 });

@@ -28,6 +28,21 @@ export const CelestialBodyType = z.enum([
   "asteroid_belt",
 ]);
 
+// Base task output schema
+export const BaseTaskOutputSchema = <TData extends z.ZodTypeAny>(
+  dataSchema: TData,
+) =>
+  z.object({
+    success: z.boolean(),
+    data: dataSchema.nullable(),
+    error: z
+      .object({
+        reason: z.string(),
+      })
+      .nullable()
+      .default(null),
+  });
+
 // Schemas for game entities
 export const ResourcesSchema = z.object({
   energy: z.number().min(0),

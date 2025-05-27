@@ -1,12 +1,80 @@
 import { hatchet } from "@/hatchet.client";
 import { z } from "zod";
 import { gameState } from "@/game/core/game-state";
+import {
+  ExecutedActionSchema,
+  ProbeActionSchema,
+  ProbeAgentOutputSchema,
+  runProbeAgent,
+} from "../agents/probe-agent";
+import { BaseTaskOutputSchema } from "@/game/core/types";
 
 // Main simulation task
 export const runSimulationInput = z.object({
   maxTicks: z.number().min(1).max(1000).default(100),
   tickDuration: z.number().min(1000).max(60000).default(5000), // milliseconds between ticks
 });
+
+// Probe execution result schema
+const ProbeExecutionResultSchema = z.object({
+  probeId: z.string(),
+  probeName: z.string(),
+  success: z.boolean(),
+  error: z.string().optional(),
+  result: ProbeAgentOutputSchema.optional(),
+});
+
+// Tick data schema
+const TickDataSchema = z.object({
+  tick: z.number(),
+  timestamp: z.number(),
+  probeCount: z.number(),
+  successfulProbes: z.number(),
+  failedProbes: z.number(),
+  probeResults: z.array(ProbeExecutionResultSchema),
+  tickDuration: z.number(),
+});
+
+// Simulation output schema
+export const runSimulationOutput = BaseTaskOutputSchema(
+  z.object({
+    totalTicks: z.number(),
+    simulationDuration: z.number(),
+    finalProbeCount: z.number(),
+    finalSystemCount: z.number(),
+    generations: z.number(),
+    executionLog: z.array(TickDataSchema),
+  }),
+);
+
+// Simulation status output schema
+export const getSimulationStatusOutput = BaseTaskOutputSchema(
+  z.object({
+    timestamp: z.number(),
+    totalProbes: z.number(),
+    totalSystems: z.number(),
+    generationStats: z.record(z.number()),
+    statusStats: z.record(z.number()),
+    totalResources: z.object({
+      energy: z.number(),
+      metal: z.number(),
+      silicon: z.number(),
+      hydrogen: z.number(),
+      rare_elements: z.number(),
+    }),
+    gameStartedAt: z.number(),
+    uptime: z.number(),
+  }),
+);
+
+// Type exports for better inference
+export type RunSimulationInput = z.infer<typeof runSimulationInput>;
+export type RunSimulationOutput = z.infer<typeof runSimulationOutput>;
+export type ProbeExecutionResult = z.infer<typeof ProbeExecutionResultSchema>;
+export type TickData = z.infer<typeof TickDataSchema>;
+export type GetSimulationStatusOutput = z.infer<
+  typeof getSimulationStatusOutput
+>;
 
 // Passive solar energy generation for all probes
 function applySolarCharging() {
@@ -62,7 +130,7 @@ export const runSimulation = hatchet.task({
 
     const simulationStartTime = Date.now();
     let tick = 0;
-    const executionLog = [];
+    const executionLog: TickData[] = [];
 
     while (tick < input.maxTicks) {
       tick++;
@@ -97,52 +165,54 @@ export const runSimulation = hatchet.task({
       }
 
       // Run each probe's AI agent in parallel
-      const probePromises = activeProbes.map(async (probe) => {
-        try {
-          console.log(
-            `🤖 Starting AI agent for ${probe.name} (${probe.id.slice(0, 8)}...)`,
-          );
+      const probePromises = activeProbes.map(
+        async (probe): Promise<ProbeExecutionResult> => {
+          try {
+            console.log(
+              `🤖 Starting AI agent for ${probe.name} (${probe.id.slice(0, 8)}...)`,
+            );
 
-          // Double-check probe still exists before running agent
-          const currentProbe = gameState.getProbe(probe.id);
-          if (!currentProbe) {
+            // Double-check probe still exists before running agent
+            const currentProbe = gameState.getProbe(probe.id);
+            if (!currentProbe) {
+              console.error(
+                `❌ Probe ${probe.name} (${probe.id}) disappeared before agent run!`,
+              );
+              return {
+                probeId: probe.id,
+                probeName: probe.name,
+                success: false,
+                error: `Probe disappeared before agent execution`,
+              };
+            }
+
+            const result = await ctx.runChild(runProbeAgent, {
+              probeId: probe.id,
+              maxActions: 3,
+            });
+
+            console.log(`✅ AI agent completed for ${probe.name}`);
+
+            return {
+              probeId: probe.id,
+              probeName: probe.name,
+              success: true,
+              result,
+            };
+          } catch (error) {
             console.error(
-              `❌ Probe ${probe.name} (${probe.id}) disappeared before agent run!`,
+              `❌ Error running probe ${probe.name} (${probe.id.slice(0, 8)}...):`,
+              error,
             );
             return {
               probeId: probe.id,
               probeName: probe.name,
               success: false,
-              error: `Probe disappeared before agent execution`,
+              error: error instanceof Error ? error.message : String(error),
             };
           }
-
-          const result = await ctx.runChild("run-probe-agent", {
-            probeId: probe.id,
-            maxActions: 3,
-          });
-
-          console.log(`✅ AI agent completed for ${probe.name}`);
-
-          return {
-            probeId: probe.id,
-            probeName: probe.name,
-            success: true,
-            result,
-          };
-        } catch (error) {
-          console.error(
-            `❌ Error running probe ${probe.name} (${probe.id.slice(0, 8)}...):`,
-            error,
-          );
-          return {
-            probeId: probe.id,
-            probeName: probe.name,
-            success: false,
-            error: error instanceof Error ? error.message : String(error),
-          };
-        }
-      });
+        },
+      );
 
       // Wait for all probe actions to complete
       const probeResults = await Promise.all(probePromises);
@@ -159,63 +229,29 @@ export const runSimulation = hatchet.task({
       // Show detailed probe results
       if (successfulProbes.length > 0) {
         console.log(`\n🎯 Successful Probe Actions:`);
-        successfulProbes.forEach((result) => {
-          const agentResult = (result.result as any)?.["run-probe-agent"];
-          if (agentResult) {
+        successfulProbes.forEach((agentResult) => {
+          if (agentResult.result) {
             console.log(
-              `  • ${result.probeName}: ${agentResult.overallStrategy}`,
+              `  • ${agentResult.probeName}: ${agentResult.result.overallStrategy}`,
             );
             console.log(
-              `    Priority: ${agentResult.priority} | Actions: ${agentResult.totalActions}`,
+              `    Priority: ${agentResult.result.priority} | Actions: ${agentResult.result.totalActions}`,
             );
-            agentResult.executedActions?.forEach((action: any, idx: number) => {
-              // Check actual task result for success/failure
-              const taskResult = action.result;
-              let status = "❌"; // Default to failed
+            agentResult.result.executedActions.forEach(
+              (action: z.infer<typeof ExecutedActionSchema>, idx: number) => {
+                // Check actual task result for success/failure
+                const taskResult = action.result;
+                let status = taskResult?.success ? "✅" : "❌"; // Default to failed
 
-              if (taskResult) {
-                // Handle different result structures
-                if (typeof taskResult === "object") {
-                  // Check if it's a wrapped Hatchet result
-                  const unwrappedResult =
-                    taskResult[action.action] || taskResult;
+                console.log(
+                  `    ${idx + 1}. ${status} ${action.action} - ${action.reasoning}`,
+                );
 
-                  // Debug logging to understand the structure (removed for cleaner output)
-
-                  // Check for success in various formats
-                  if (unwrappedResult?.success === true) {
-                    status = "✅";
-                  } else if (unwrappedResult?.success === false) {
-                    status = "❌";
-                  } else {
-                    // If no explicit success field, assume success if no error
-                    status = action.error ? "❌" : "✅";
-                  }
-                } else {
-                  status = "❌";
+                if (taskResult?.error?.reason) {
+                  console.log(`        Reason: ${taskResult.error.reason}`);
                 }
-              }
-
-              // If there's an explicit error, it's definitely failed
-              if (action.error) {
-                status = "❌";
-              }
-
-              console.log(
-                `    ${idx + 1}. ${status} ${action.action} - ${action.reasoning}`,
-              );
-
-              // Show failure reason if available
-              if (status === "❌" && taskResult) {
-                const unwrappedResult = taskResult[action.action] || taskResult;
-                if (unwrappedResult?.reason) {
-                  console.log(`        Reason: ${unwrappedResult.reason}`);
-                }
-                if (action.error) {
-                  console.log(`        Error: ${action.error}`);
-                }
-              }
-            });
+              },
+            );
           }
         });
       }
@@ -243,7 +279,7 @@ export const runSimulation = hatchet.task({
         });
       }
 
-      const tickData = {
+      const tickData: TickData = {
         tick,
         timestamp: Date.now(),
         probeCount: activeProbes.length,
@@ -292,7 +328,11 @@ export const runSimulation = hatchet.task({
     console.log(`🌟 Systems discovered: ${finalReport.finalSystemCount}`);
     console.log(`🧬 Maximum generation: ${finalReport.generations}`);
 
-    return finalReport;
+    return runSimulationOutput.parse({
+      success: true,
+      data: finalReport,
+      error: null,
+    });
   },
 });
 
@@ -344,7 +384,7 @@ export const getSimulationStatus = hatchet.task({
     console.log(`⚙️ Status Distribution:`, statusStats);
     console.log(`💎 Total Resources:`, totalResources);
 
-    return {
+    const statusData = {
       timestamp: Date.now(),
       totalProbes: allProbes.length,
       totalSystems: allSystems.length,
@@ -354,5 +394,11 @@ export const getSimulationStatus = hatchet.task({
       gameStartedAt: state.gameStartedAt,
       uptime: Date.now() - state.gameStartedAt,
     };
+
+    return getSimulationStatusOutput.parse({
+      success: true,
+      data: statusData,
+      error: null,
+    });
   },
 });

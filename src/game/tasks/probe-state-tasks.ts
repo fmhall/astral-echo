@@ -5,12 +5,19 @@ import {
   ProbeSchema,
   SolarSystemSchema,
   CelestialBodySchema,
+  BaseTaskOutputSchema,
 } from "@/game/core/types";
 
 // Task: Get probe state
 export const getProbeStateInput = z.object({
   probeId: z.string(),
 });
+
+export const getProbeStateOutput = BaseTaskOutputSchema(
+  z.object({
+    probe: ProbeSchema,
+  }),
+);
 
 export const getProbeState = hatchet.task({
   name: "get-probe-state",
@@ -26,9 +33,13 @@ export const getProbeState = hatchet.task({
       `[PROBE ${probe.name}] Status: ${probe.status}, Energy: ${probe.resources.energy}`,
     );
 
-    return {
-      probe: ProbeSchema.parse(probe),
-    };
+    return getProbeStateOutput.parse({
+      success: true,
+      data: {
+        probe: ProbeSchema.parse(probe),
+      },
+      error: null,
+    });
   },
 });
 
@@ -36,6 +47,20 @@ export const getProbeState = hatchet.task({
 export const getEnvironmentStateInput = z.object({
   probeId: z.string(),
 });
+
+export const getEnvironmentStateOutput = BaseTaskOutputSchema(
+  z.object({
+    currentSystem: SolarSystemSchema,
+    nearbyBodies: z.array(
+      z.object({
+        body: CelestialBodySchema,
+        distance: z.number(),
+      }),
+    ),
+    closestBody: CelestialBodySchema,
+    distanceToClosest: z.number(),
+  }),
+);
 
 export const getEnvironmentState = hatchet.task({
   name: "get-environment-state",
@@ -67,12 +92,16 @@ export const getEnvironmentState = hatchet.task({
       `[PROBE ${probe.name}] Nearest body: ${closestBody.body.name} at ${closestBody.distance.toFixed(1)} AU`,
     );
 
-    return {
-      currentSystem: SolarSystemSchema.parse(currentSystem),
-      nearbyBodies,
-      closestBody: closestBody.body,
-      distanceToClosest: closestBody.distance,
-    };
+    return getEnvironmentStateOutput.parse({
+      success: true,
+      data: {
+        currentSystem: SolarSystemSchema.parse(currentSystem),
+        nearbyBodies,
+        closestBody: closestBody.body,
+        distanceToClosest: closestBody.distance,
+      },
+      error: null,
+    });
   },
 });
 
@@ -80,6 +109,14 @@ export const getEnvironmentState = hatchet.task({
 export const getSolarSystemStateInput = z.object({
   systemId: z.string(),
 });
+
+export const getSolarSystemStateOutput = BaseTaskOutputSchema(
+  z.object({
+    system: SolarSystemSchema,
+    totalResources: z.record(z.any()),
+    bodyCount: z.number(),
+  }),
+);
 
 export const getSolarSystemState = hatchet.task({
   name: "get-solar-system-state",
@@ -105,11 +142,15 @@ export const getSolarSystemState = hatchet.task({
       },
     );
 
-    return {
-      system: SolarSystemSchema.parse(system),
-      totalResources,
-      bodyCount: system.bodies.length,
-    };
+    return getSolarSystemStateOutput.parse({
+      success: true,
+      data: {
+        system: SolarSystemSchema.parse(system),
+        totalResources,
+        bodyCount: system.bodies.length,
+      },
+      error: null,
+    });
   },
 });
 
@@ -118,6 +159,14 @@ export const scanForResourcesInput = z.object({
   probeId: z.string(),
   targetBodyId: z.string(),
 });
+
+export const scanForResourcesOutput = BaseTaskOutputSchema(
+  z.object({
+    bodyName: z.string(),
+    resources: z.record(z.any()),
+    distance: z.number(),
+  }),
+);
 
 export const scanForResources = hatchet.task({
   name: "scan-for-resources",
@@ -152,12 +201,13 @@ export const scanForResources = hatchet.task({
       console.log(
         `[PROBE ${probe.name}] Target ${targetBody.name} is out of sensor range`,
       );
-      return {
+      return scanForResourcesOutput.parse({
         success: false,
-        reason: "out_of_range",
-        distance,
-        maxRange: probe.capabilities.sensorRange,
-      };
+        data: null,
+        error: {
+          reason: `out_of_range, max range is ${probe.capabilities.sensorRange}, distance is ${distance}`,
+        },
+      });
     }
 
     // Update probe memory with discovered resources
@@ -178,11 +228,14 @@ export const scanForResources = hatchet.task({
       `[PROBE ${probe.name}] Scanned ${targetBody.name}: ${JSON.stringify(targetBody.resources)}`,
     );
 
-    return {
+    return scanForResourcesOutput.parse({
       success: true,
-      bodyName: targetBody.name,
-      resources: targetBody.resources,
-      distance,
-    };
+      data: {
+        bodyName: targetBody.name,
+        resources: targetBody.resources,
+        distance,
+      },
+      error: null,
+    });
   },
 });

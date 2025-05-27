@@ -1,4 +1,8 @@
 import { hatchet } from "@/hatchet.client";
+import {
+  runSimulation,
+  getSimulationStatus,
+} from "./simulation/astral-echo-simulation";
 
 async function startSimulation() {
   console.log("🌌 Astral Echo - Self-Replicating Probe Simulation");
@@ -7,24 +11,16 @@ async function startSimulation() {
   try {
     // Get initial status
     console.log("📊 Getting initial simulation status...");
-    const statusRef = await hatchet.admin.runWorkflow(
-      "get-simulation-status",
-      {},
-    );
-    const status = await statusRef.output;
+    const status = await getSimulationStatus.run({});
     console.log("Initial status:", status);
 
     // Start the simulation
     console.log("\n🚀 Starting simulation with 5 ticks...");
-    const resultRef = await hatchet.admin.runWorkflow(
-      "run-astral-echo-simulation",
-      {
-        maxTicks: 5,
-        tickDuration: 10000, // 2 seconds between ticks
-      },
-    );
+    const result = await runSimulation.run({
+      maxTicks: 5,
+      tickDuration: 10000, // 2 seconds between ticks
+    });
 
-    const result = await resultRef.output;
     console.log("\n🎯 Simulation Results:", result);
   } catch (error) {
     console.error("❌ Error running simulation:", error);
@@ -33,11 +29,7 @@ async function startSimulation() {
 
 async function getStatus() {
   try {
-    const statusRef = await hatchet.admin.runWorkflow(
-      "get-simulation-status",
-      {},
-    );
-    const status = await statusRef.output;
+    const status = await getSimulationStatus.run({});
     console.log("📊 Current Status:", status);
   } catch (error) {
     console.error("❌ Error getting status:", error);

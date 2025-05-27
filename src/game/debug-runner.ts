@@ -1,5 +1,7 @@
 import { hatchet } from "@/hatchet.client";
 import { gameState } from "@/game/core/game-state";
+import { getEnvironmentState, getProbeState } from "./tasks/probe-state-tasks";
+import { runProbeAgent } from "./agents/probe-agent";
 
 async function debugGameState() {
   console.log("🔍 === DEBUGGING GAME STATE ===");
@@ -21,11 +23,13 @@ async function debugGameState() {
     // Test 3: Try running get-probe-state task
     console.log("\n3️⃣ Testing get-probe-state task...");
     try {
-      const stateResult = await hatchet.admin.runWorkflow("get-probe-state", {
+      const stateResult = await getProbeState.run({
         probeId: firstProbe.id,
       });
-      const result = await stateResult.output;
-      console.log("get-probe-state result:", JSON.stringify(result, null, 2));
+      console.log(
+        "get-probe-state result:",
+        JSON.stringify(stateResult, null, 2),
+      );
     } catch (error) {
       console.error("get-probe-state failed:", error);
     }
@@ -33,16 +37,12 @@ async function debugGameState() {
     // Test 4: Try running get-environment-state task
     console.log("\n4️⃣ Testing get-environment-state task...");
     try {
-      const envResult = await hatchet.admin.runWorkflow(
-        "get-environment-state",
-        {
-          probeId: firstProbe.id,
-        },
-      );
-      const result = await envResult.output;
+      const envResult = await getEnvironmentState.run({
+        probeId: firstProbe.id,
+      });
       console.log(
         "get-environment-state result:",
-        JSON.stringify(result, null, 2),
+        JSON.stringify(envResult, null, 2),
       );
     } catch (error) {
       console.error("get-environment-state failed:", error);
@@ -51,12 +51,14 @@ async function debugGameState() {
     // Test 5: Try running probe agent
     console.log("\n5️⃣ Testing run-probe-agent task...");
     try {
-      const agentResult = await hatchet.admin.runWorkflow("run-probe-agent", {
+      const agentResult = await runProbeAgent.run({
         probeId: firstProbe.id,
         maxActions: 1,
       });
-      const result = await agentResult.output;
-      console.log("run-probe-agent result:", JSON.stringify(result, null, 2));
+      console.log(
+        "run-probe-agent result:",
+        JSON.stringify(agentResult, null, 2),
+      );
     } catch (error) {
       console.error("run-probe-agent failed:", error);
     }

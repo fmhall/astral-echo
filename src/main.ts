@@ -1,5 +1,6 @@
 import { hatchet } from "@/hatchet.client";
 import { gameState } from "@/game/core/game-state";
+import { logger } from "@/utils/logger";
 
 // Import all game tasks
 import {
@@ -23,15 +24,15 @@ import {
 } from "@/game/simulation/astral-echo-simulation";
 
 const main = async () => {
-  console.log("🚀 Starting Astral Echo Worker...");
+  logger.info("🚀 Starting Astral Echo Worker...");
 
   // Initialize game state in the worker process
-  console.log("🎮 Initializing game state in worker process...");
+  logger.info("🎮 Initializing game state in worker process...");
   const allProbes = gameState.getAllProbes();
 
-  console.log(`🛸 Initialized with ${allProbes.length} probes:`);
+  logger.info(`🛸 Initialized with ${allProbes.length} probes:`);
   allProbes.forEach((probe) => {
-    console.log(
+    logger.info(
       `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation}`,
     );
   });
@@ -58,12 +59,12 @@ const main = async () => {
     ],
   });
 
-  console.log("🎮 Astral Echo Worker ready! Game systems initialized.");
-  console.log(
+  logger.info("🎮 Astral Echo Worker ready! Game systems initialized.");
+  logger.info(
     "🌌 Ready to simulate self-replicating probes exploring the stars...",
   );
 
   await worker.start();
 };
 
-main().catch(console.error);
+main().catch((error) => logger.error({ error }, "Failed to start worker"));

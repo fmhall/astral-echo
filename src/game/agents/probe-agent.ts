@@ -170,10 +170,13 @@ export const runProbeAgent = hatchet.task({
       );
 
       // Use AI to decide what actions to take
-      const { object: decision } = await generateObject({
-        model: openai("gpt-4.1-mini"),
-        schema: ProbeDecisionSchema,
-        system: `You are an advanced AI controlling a self-replicating space probe in the Astral Echo simulation.
+      ctx.logger.info(`🧠 [AI AGENT] ${probe.name} calling generateObject...`);
+      let decision;
+      try {
+        const result = await generateObject({
+          model: openai("gpt-4.1-mini"),
+          schema: ProbeDecisionSchema,
+          system: `You are an advanced AI controlling a self-replicating space probe in the Astral Echo simulation.
         
         Your probe has these capabilities:
         - Scan celestial bodies for resources
@@ -215,7 +218,7 @@ export const runProbeAgent = hatchet.task({
         - wait: {} (empty object)
         - explore_system: {} (empty object)`,
 
-        prompt: `Analyze the current situation and decide on the next ${input.maxActions} actions for this probe:
+          prompt: `Analyze the current situation and decide on the next ${input.maxActions} actions for this probe:
         
         Probe Status:
         - Name: ${probeData.name}
@@ -278,7 +281,29 @@ export const runProbeAgent = hatchet.task({
           "overallStrategy": "Harvest resources then manufacture offspring",
           "priority": "resource_gathering"
         }`,
-      });
+        });
+
+        decision = result.object;
+        ctx.logger.info(
+          `✅ [AI AGENT] ${probe.name} generateObject completed successfully`,
+        );
+      } catch (aiError) {
+        ctx.logger.error(
+          `❌ [AI AGENT] ${probe.name} generateObject failed: ${aiError}`,
+        );
+        // Fallback to a simple wait action if AI fails
+        decision = {
+          actions: [
+            {
+              action: "wait" as const,
+              parameters: {},
+              reasoning: "AI decision making failed, waiting for next tick",
+            },
+          ],
+          overallStrategy: "Fallback strategy due to AI failure",
+          priority: "survival" as const,
+        };
+      }
 
       ctx.logger.info(
         `🎯 [AI AGENT] ${probe.name} strategy: ${decision.overallStrategy}`,
@@ -374,14 +399,6 @@ export const runProbeAgent = hatchet.task({
 
             case "harvest_resources":
               if (params.bodyId && params.duration) {
-                logTask(
-                  "harvest-resources",
-                  input.probeId,
-                  probe.name,
-                  params,
-                  undefined,
-                  ctx,
-                );
                 result = await ctx.runChild(harvestResources, {
                   probeId: input.probeId,
                   targetBodyId: params.bodyId,
@@ -413,14 +430,6 @@ export const runProbeAgent = hatchet.task({
 
             case "manufacture_probe":
               if (params.newProbeName) {
-                logTask(
-                  "manufacture-probe",
-                  input.probeId,
-                  probe.name,
-                  params,
-                  undefined,
-                  ctx,
-                );
                 result = await ctx.runChild(manufactureProbe, {
                   probeId: input.probeId,
                   newProbeName: params.newProbeName,

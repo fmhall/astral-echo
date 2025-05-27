@@ -2,104 +2,96 @@ import { hatchet } from "@/hatchet.client";
 import { gameState } from "@/game/core/game-state";
 import { getEnvironmentState, getProbeState } from "./tasks/probe-state-tasks";
 import { runProbeAgent } from "./agents/probe-agent";
+import { logger } from "@/utils/logger";
 
 async function debugGameState() {
-  console.log("🔍 === DEBUGGING GAME STATE ===");
+  logger.info("🔍 === DEBUGGING GAME STATE ===");
 
   // Test 1: Check initial game state
-  console.log("\n1️⃣ Testing initial game state...");
+  logger.info("\n1️⃣ Testing initial game state...");
   const allProbes = gameState.getAllProbes();
-  console.log(`Found ${allProbes.length} probes`);
+  logger.info(`Found ${allProbes.length} probes`);
 
   if (allProbes.length > 0) {
     const firstProbe = allProbes[0];
-    console.log(`First probe: ${firstProbe.name} (${firstProbe.id})`);
+    logger.info(`First probe: ${firstProbe.name} (${firstProbe.id})`);
 
     // Test 2: Try getting probe by ID
-    console.log("\n2️⃣ Testing probe retrieval...");
+    logger.info("\n2️⃣ Testing probe retrieval...");
     const retrievedProbe = gameState.getProbe(firstProbe.id);
-    console.log(`Retrieved probe: ${retrievedProbe ? "SUCCESS" : "FAILED"}`);
+    logger.info(`Retrieved probe: ${retrievedProbe ? "SUCCESS" : "FAILED"}`);
 
     // Test 3: Try running get-probe-state task
-    console.log("\n3️⃣ Testing get-probe-state task...");
+    logger.info("\n3️⃣ Testing get-probe-state task...");
     try {
-      const stateResult = await getProbeState.run({
+      const stateResult = await hatchet.run(getProbeState, {
         probeId: firstProbe.id,
       });
-      console.log(
-        "get-probe-state result:",
-        JSON.stringify(stateResult, null, 2),
-      );
+      logger.info({ result: stateResult }, "get-probe-state result");
     } catch (error) {
-      console.error("get-probe-state failed:", error);
+      logger.error({ error }, "get-probe-state failed");
     }
 
     // Test 4: Try running get-environment-state task
-    console.log("\n4️⃣ Testing get-environment-state task...");
+    logger.info("\n4️⃣ Testing get-environment-state task...");
     try {
-      const envResult = await getEnvironmentState.run({
+      const envResult = await hatchet.run(getEnvironmentState, {
         probeId: firstProbe.id,
       });
-      console.log(
-        "get-environment-state result:",
-        JSON.stringify(envResult, null, 2),
-      );
+      logger.info({ result: envResult }, "get-environment-state result");
     } catch (error) {
-      console.error("get-environment-state failed:", error);
+      logger.error({ error }, "get-environment-state failed");
     }
 
     // Test 5: Try running probe agent
-    console.log("\n5️⃣ Testing run-probe-agent task...");
+    logger.info("\n5️⃣ Testing run-probe-agent task...");
     try {
-      const agentResult = await runProbeAgent.run({
+      const agentResult = await hatchet.run(runProbeAgent, {
         probeId: firstProbe.id,
         maxActions: 1,
       });
-      console.log(
-        "run-probe-agent result:",
-        JSON.stringify(agentResult, null, 2),
-      );
+      logger.info({ result: agentResult }, "run-probe-agent result");
     } catch (error) {
-      console.error("run-probe-agent failed:", error);
+      logger.error({ error }, "run-probe-agent failed");
     }
   }
 }
 
 function resetGameState() {
-  console.log("🗑️  === RESETTING GAME STATE ===");
+  logger.info("🗑️  === RESETTING GAME STATE ===");
   gameState.resetGameState();
-  console.log("✅ Game state reset complete!");
+  logger.info("✅ Game state reset complete!");
 
   // Show new state
   const allProbes = gameState.getAllProbes();
-  console.log(`New game initialized with ${allProbes.length} probes.`);
+  logger.info(`New game initialized with ${allProbes.length} probes.`);
 }
 
 function showGameState() {
-  console.log("📊 === CURRENT GAME STATE ===");
+  logger.info("📊 === CURRENT GAME STATE ===");
   const state = gameState.getState();
   const allProbes = gameState.getAllProbes();
   const allSystems = gameState.getAllSystems();
 
-  console.log(`\n🛸 Probes: ${allProbes.length}`);
+  logger.info(`\n🛸 Probes: ${allProbes.length}`);
   allProbes.forEach((probe) => {
-    console.log(
+    logger.info(
       `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation} [${probe.status}]`,
     );
-    console.log(
+    logger.info(
       `    Resources: E:${probe.resources.energy} M:${probe.resources.metal} S:${probe.resources.silicon}`,
     );
   });
 
-  console.log(`\n🌟 Solar Systems: ${allSystems.length}`);
+  logger.info(`\n🌟 Solar Systems: ${allSystems.length}`);
   allSystems.forEach((system) => {
-    console.log(`  - ${system.name} (${system.bodies.length} bodies)`);
+    logger.info(`  - ${system.name} (${system.bodies.length} bodies)`);
   });
 
-  console.log(
+  logger.info(
     `\n⏰ Game started: ${new Date(state.gameStartedAt).toISOString()}`,
   );
-  console.log(
+  logger.info(
     `⏱️  Uptime: ${((Date.now() - state.gameStartedAt) / 1000).toFixed(1)}s`,
   );
 }
@@ -118,12 +110,12 @@ switch (command) {
     showGameState();
     break;
   default:
-    console.log("Usage:");
-    console.log(
+    logger.info("Usage:");
+    logger.info(
       "  bun run src/game/debug-runner.ts debug  # Test Hatchet tasks",
     );
-    console.log("  bun run src/game/debug-runner.ts reset  # Reset game state");
-    console.log(
+    logger.info("  bun run src/game/debug-runner.ts reset  # Reset game state");
+    logger.info(
       "  bun run src/game/debug-runner.ts show   # Show current state",
     );
 }

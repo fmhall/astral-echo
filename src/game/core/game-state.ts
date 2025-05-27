@@ -8,6 +8,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import * as fs from "fs";
 import * as path from "path";
+import { logger } from "@/utils/logger";
 
 const GAME_STATE_FILE = path.join(process.cwd(), "game-state.json");
 
@@ -19,7 +20,7 @@ class GameStateManager {
 
   private constructor() {
     this.instanceId = `GS-${Date.now()}`;
-    console.log(
+    logger.debug(
       `🎮 [DEBUG] Creating GameStateManager instance: ${this.instanceId}`,
     );
     this.state = this.loadOrInitializeGameState();
@@ -36,23 +37,23 @@ class GameStateManager {
     // Try to load existing state from file
     if (fs.existsSync(GAME_STATE_FILE)) {
       try {
-        console.log(`📁 Loading existing game state from ${GAME_STATE_FILE}`);
+        logger.info(`📁 Loading existing game state from ${GAME_STATE_FILE}`);
         const savedState = JSON.parse(fs.readFileSync(GAME_STATE_FILE, "utf8"));
-        console.log(
+        logger.info(
           `✅ Loaded game state with ${Object.keys(savedState.probes).length} probes`,
         );
         Object.values(savedState.probes).forEach((probe: any) => {
-          console.log(
+          logger.info(
             `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation}`,
           );
         });
         return savedState;
       } catch (error) {
-        console.error(`❌ Failed to load game state:`, error);
-        console.log(`🆕 Creating new game state...`);
+        logger.error({ error }, `❌ Failed to load game state`);
+        logger.info(`🆕 Creating new game state...`);
       }
     } else {
-      console.log(`🆕 No existing game state found, creating new one...`);
+      logger.info(`🆕 No existing game state found, creating new one...`);
     }
 
     return this.initializeGameState();
@@ -61,11 +62,11 @@ class GameStateManager {
   private saveGameState(): void {
     try {
       fs.writeFileSync(GAME_STATE_FILE, JSON.stringify(this.state, null, 2));
-      console.log(
+      logger.debug(
         `💾 [DEBUG] Game state saved to ${GAME_STATE_FILE} (Instance: ${this.instanceId})`,
       );
     } catch (error) {
-      console.error(`❌ Failed to save game state:`, error);
+      logger.error({ error }, `❌ Failed to save game state`);
     }
   }
 
@@ -73,7 +74,7 @@ class GameStateManager {
     const firstSystemId = uuidv4();
     const firstProbeId = uuidv4();
 
-    console.log(
+    logger.info(
       `🚀 Initializing new game with probe ${firstProbeId.slice(0, 8)}...`,
     );
 
@@ -207,11 +208,11 @@ class GameStateManager {
 
   getProbe(probeId: string): Probe | undefined {
     const probe = this.state.probes[probeId];
-    console.log(
+    logger.debug(
       `🔍 [DEBUG] Getting probe ${probeId.slice(0, 8)}... - ${probe ? "FOUND" : "NOT FOUND"} (Instance: ${this.instanceId})`,
     );
     if (!probe) {
-      console.log(
+      logger.debug(
         `🔍 [DEBUG] Available probe IDs: ${Object.keys(this.state.probes)
           .map((id) => id.slice(0, 8) + "...")
           .join(", ")}`,
@@ -225,11 +226,11 @@ class GameStateManager {
     if (probe) {
       this.state.probes[probeId] = { ...probe, ...updates };
       this.saveGameState();
-      console.log(
+      logger.debug(
         `🔄 [DEBUG] Updated probe ${probeId.slice(0, 8)}... (Instance: ${this.instanceId})`,
       );
     } else {
-      console.error(
+      logger.error(
         `❌ [DEBUG] Cannot update probe ${probeId.slice(0, 8)}... - not found (Instance: ${this.instanceId})`,
       );
     }
@@ -238,7 +239,7 @@ class GameStateManager {
   addProbe(probe: Probe): void {
     this.state.probes[probe.id] = probe;
     this.saveGameState();
-    console.log(
+    logger.debug(
       `➕ [DEBUG] Added probe ${probe.name} (${probe.id.slice(0, 8)}...) (Instance: ${this.instanceId})`,
     );
   }
@@ -259,11 +260,11 @@ class GameStateManager {
 
   getAllProbes(): Probe[] {
     const probes = Object.values(this.state.probes);
-    console.log(
+    logger.debug(
       `📊 [DEBUG] Getting all probes: ${probes.length} found (Instance: ${this.instanceId})`,
     );
     probes.forEach((p) =>
-      console.log(`  - ${p.name} (${p.id.slice(0, 8)}...)`),
+      logger.debug(`  - ${p.name} (${p.id.slice(0, 8)}...)`),
     );
     return probes;
   }
@@ -276,7 +277,7 @@ class GameStateManager {
   resetGameState(): void {
     if (fs.existsSync(GAME_STATE_FILE)) {
       fs.unlinkSync(GAME_STATE_FILE);
-      console.log(`🗑️  Deleted game state file`);
+      logger.info(`🗑️  Deleted game state file`);
     }
     this.state = this.initializeGameState();
   }
@@ -342,9 +343,9 @@ class GameStateManager {
         },
       });
 
-      console.log(`📝 [MEMORY] ${probe.name}: ${experience.event} recorded`);
+      logger.debug(`📝 [MEMORY] ${probe.name}: ${experience.event} recorded`);
     } else {
-      console.error(
+      logger.error(
         `❌ [MEMORY] Cannot add experience to probe ${probeId} - not found`,
       );
     }

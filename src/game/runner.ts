@@ -3,36 +3,37 @@ import {
   runSimulation,
   getSimulationStatus,
 } from "./simulation/astral-echo-simulation";
+import { logger } from "@/utils/logger";
 
 async function startSimulation() {
-  console.log("🌌 Astral Echo - Self-Replicating Probe Simulation");
-  console.log("===================================================");
+  logger.info("🌌 Astral Echo - Self-Replicating Probe Simulation");
+  logger.info("===================================================");
 
   try {
     // Get initial status
-    console.log("📊 Getting initial simulation status...");
-    const status = await getSimulationStatus.run({});
-    console.log("Initial status:", status);
+    logger.info("📊 Getting initial simulation status...");
+    const status = await hatchet.run(getSimulationStatus, {});
+    logger.info({ status }, "Initial status");
 
     // Start the simulation
-    console.log("\n🚀 Starting simulation with 5 ticks...");
-    const result = await runSimulation.run({
+    logger.info("\n🚀 Starting simulation with 5 ticks...");
+    const result = await hatchet.run(runSimulation, {
       maxTicks: 5,
-      tickDuration: 10000, // 2 seconds between ticks
+      tickDuration: 10000, // 10 seconds between ticks
     });
 
-    console.log("\n🎯 Simulation Results:", result);
+    logger.info({ result }, "\n🎯 Simulation Results");
   } catch (error) {
-    console.error("❌ Error running simulation:", error);
+    logger.error({ error }, "❌ Error running simulation");
   }
 }
 
 async function getStatus() {
   try {
-    const status = await getSimulationStatus.run({});
-    console.log("📊 Current Status:", status);
+    const status = await hatchet.run(getSimulationStatus, {});
+    logger.info({ status }, "📊 Current Status");
   } catch (error) {
-    console.error("❌ Error getting status:", error);
+    logger.error({ error }, "❌ Error getting status");
   }
 }
 
@@ -47,7 +48,7 @@ switch (command) {
     getStatus();
     break;
   default:
-    console.log("Usage:");
-    console.log("  bun run src/game/runner.ts start   - Start simulation");
-    console.log("  bun run src/game/runner.ts status  - Get current status");
+    logger.info("Usage:");
+    logger.info("  bun run src/game/runner.ts start   - Start simulation");
+    logger.info("  bun run src/game/runner.ts status  - Get current status");
 }

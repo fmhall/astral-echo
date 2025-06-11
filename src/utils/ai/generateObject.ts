@@ -1,8 +1,9 @@
 import { hatchet } from "@/hatchet.client";
-import { generateText, Message, CoreMessage } from "ai";
+import { generateObject as aiGenerateObject, Message, CoreMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
 
-export const DEFAULT_MODEL = openai.responses("gpt-4.1-mini");
+export const DEFAULT_OBJECT_MODEL = openai("gpt-4o-mini");
 
 /**
 Prompt part of the AI function options.
@@ -23,28 +24,35 @@ type Prompt = {
   messages?: Array<CoreMessage> | Array<Omit<Message, "id">>;
 };
 
-type PromptInput = Prompt & {
+type PromptInputData = Prompt & {
   /**
     The language model to use.
     */
   modelId?: string;
+  /**
+    The schema for the structured output (as JSON schema).
+    */
+  schema: Record<string, unknown>;
 };
 
 type PromptOutput = {
-  text: string;
+  object: string;
 };
 
 export const generateObject = hatchet.task({
   name: "generate-object",
   executionTimeout: "5m",
-  fn: async (input: PromptInput): Promise<PromptOutput> => {
-    const result = await generateText({
-      ...input,
-      model: input.modelId ? openai.responses(input.modelId) : DEFAULT_MODEL,
+  fn: async (input: Record<string, unknown>): Promise<PromptOutput> => {
+    const typedInput = input as PromptInputData;
+    const { schema, modelId, ...promptInput } = typedInput;
+    const result = await aiGenerateObject({
+      ...promptInput,
+      model: modelId ? openai(modelId) : DEFAULT_OBJECT_MODEL,
+      schema: z.object(schema as Record<string, z.ZodType>),
     });
 
     return {
-      text: result.text,
+      object: JSON.stringify(result.object),
     };
   },
 });

@@ -30,7 +30,7 @@ export const CelestialBodyType = z.enum([
 
 // Base task output schema
 export const BaseTaskOutputSchema = <TData extends z.ZodTypeAny>(
-  dataSchema: TData,
+  dataSchema: TData
 ) =>
   z.object({
     success: z.boolean(),
@@ -67,7 +67,7 @@ export const ProbeMemorySchema = z.object({
       timestamp: z.number(),
       event: z.string(),
       data: z.record(z.any()),
-    }),
+    })
   ),
 });
 

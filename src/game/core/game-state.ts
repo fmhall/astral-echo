@@ -21,7 +21,7 @@ class GameStateManager {
   private constructor() {
     this.instanceId = `GS-${Date.now()}`;
     logger.debug(
-      `🎮 [DEBUG] Creating GameStateManager instance: ${this.instanceId}`,
+      `🎮 [DEBUG] Creating GameStateManager instance: ${this.instanceId}`
     );
     this.state = this.loadOrInitializeGameState();
   }
@@ -40,11 +40,11 @@ class GameStateManager {
         logger.info(`📁 Loading existing game state from ${GAME_STATE_FILE}`);
         const savedState = JSON.parse(fs.readFileSync(GAME_STATE_FILE, "utf8"));
         logger.info(
-          `✅ Loaded game state with ${Object.keys(savedState.probes).length} probes`,
+          `✅ Loaded game state with ${Object.keys(savedState.probes).length} probes`
         );
         Object.values(savedState.probes).forEach((probe: any) => {
           logger.info(
-            `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation}`,
+            `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation}`
           );
         });
         return savedState;
@@ -63,7 +63,7 @@ class GameStateManager {
     try {
       fs.writeFileSync(GAME_STATE_FILE, JSON.stringify(this.state, null, 2));
       logger.debug(
-        `💾 [DEBUG] Game state saved to ${GAME_STATE_FILE} (Instance: ${this.instanceId})`,
+        `💾 [DEBUG] Game state saved to ${GAME_STATE_FILE} (Instance: ${this.instanceId})`
       );
     } catch (error) {
       logger.error({ error }, `❌ Failed to save game state`);
@@ -75,7 +75,7 @@ class GameStateManager {
     const firstProbeId = uuidv4();
 
     logger.info(
-      `🚀 Initializing new game with probe ${firstProbeId.slice(0, 8)}...`,
+      `🚀 Initializing new game with probe ${firstProbeId.slice(0, 8)}...`
     );
 
     // Create the first solar system
@@ -209,13 +209,13 @@ class GameStateManager {
   getProbe(probeId: string): Probe | undefined {
     const probe = this.state.probes[probeId];
     logger.debug(
-      `🔍 [DEBUG] Getting probe ${probeId.slice(0, 8)}... - ${probe ? "FOUND" : "NOT FOUND"} (Instance: ${this.instanceId})`,
+      `🔍 [DEBUG] Getting probe ${probeId.slice(0, 8)}... - ${probe ? "FOUND" : "NOT FOUND"} (Instance: ${this.instanceId})`
     );
     if (!probe) {
       logger.debug(
         `🔍 [DEBUG] Available probe IDs: ${Object.keys(this.state.probes)
-          .map((id) => id.slice(0, 8) + "...")
-          .join(", ")}`,
+          .map(id => id.slice(0, 8) + "...")
+          .join(", ")}`
       );
     }
     return probe;
@@ -227,11 +227,11 @@ class GameStateManager {
       this.state.probes[probeId] = { ...probe, ...updates };
       this.saveGameState();
       logger.debug(
-        `🔄 [DEBUG] Updated probe ${probeId.slice(0, 8)}... (Instance: ${this.instanceId})`,
+        `🔄 [DEBUG] Updated probe ${probeId.slice(0, 8)}... (Instance: ${this.instanceId})`
       );
     } else {
       logger.error(
-        `❌ [DEBUG] Cannot update probe ${probeId.slice(0, 8)}... - not found (Instance: ${this.instanceId})`,
+        `❌ [DEBUG] Cannot update probe ${probeId.slice(0, 8)}... - not found (Instance: ${this.instanceId})`
       );
     }
   }
@@ -240,7 +240,7 @@ class GameStateManager {
     this.state.probes[probe.id] = probe;
     this.saveGameState();
     logger.debug(
-      `➕ [DEBUG] Added probe ${probe.name} (${probe.id.slice(0, 8)}...) (Instance: ${this.instanceId})`,
+      `➕ [DEBUG] Added probe ${probe.name} (${probe.id.slice(0, 8)}...) (Instance: ${this.instanceId})`
     );
   }
 
@@ -261,11 +261,9 @@ class GameStateManager {
   getAllProbes(): Probe[] {
     const probes = Object.values(this.state.probes);
     logger.debug(
-      `📊 [DEBUG] Getting all probes: ${probes.length} found (Instance: ${this.instanceId})`,
+      `📊 [DEBUG] Getting all probes: ${probes.length} found (Instance: ${this.instanceId})`
     );
-    probes.forEach((p) =>
-      logger.debug(`  - ${p.name} (${p.id.slice(0, 8)}...)`),
-    );
+    probes.forEach(p => logger.debug(`  - ${p.name} (${p.id.slice(0, 8)}...)`));
     return probes;
   }
 
@@ -287,7 +285,7 @@ class GameStateManager {
     const distanceInKm = Math.sqrt(
       Math.pow(pos2.x - pos1.x, 2) +
         Math.pow(pos2.y - pos1.y, 2) +
-        Math.pow(pos2.z - pos1.z, 2),
+        Math.pow(pos2.z - pos1.z, 2)
     );
     // Convert from millions of km to AU (1 AU = 150 million km)
     return distanceInKm / 150;
@@ -295,7 +293,7 @@ class GameStateManager {
 
   canAffordResources(available: Resources, cost: Resources): boolean {
     return Object.entries(cost).every(
-      ([resource, amount]) => available[resource as keyof Resources] >= amount,
+      ([resource, amount]) => available[resource as keyof Resources] >= amount
     );
   }
 
@@ -326,7 +324,7 @@ class GameStateManager {
       event: string;
       data?: any;
       timestamp?: number;
-    },
+    }
   ): void {
     const probe = this.getProbe(probeId);
     if (probe) {
@@ -346,7 +344,7 @@ class GameStateManager {
       logger.debug(`📝 [MEMORY] ${probe.name}: ${experience.event} recorded`);
     } else {
       logger.error(
-        `❌ [MEMORY] Cannot add experience to probe ${probeId} - not found`,
+        `❌ [MEMORY] Cannot add experience to probe ${probeId} - not found`
       );
     }
   }

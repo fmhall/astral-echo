@@ -31,9 +31,9 @@ const main = async () => {
   const allProbes = gameState.getAllProbes();
 
   logger.info(`🛸 Initialized with ${allProbes.length} probes:`);
-  allProbes.forEach((probe) => {
+  allProbes.forEach(probe => {
     logger.info(
-      `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation}`,
+      `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation}`
     );
   });
 
@@ -61,10 +61,10 @@ const main = async () => {
 
   logger.info("🎮 Astral Echo Worker ready! Game systems initialized.");
   logger.info(
-    "🌌 Ready to simulate self-replicating probes exploring the stars...",
+    "🌌 Ready to simulate self-replicating probes exploring the stars..."
   );
 
   await worker.start();
 };
 
-main().catch((error) => logger.error({ error }, "Failed to start worker"));
+main().catch(error => logger.error({ error }, "Failed to start worker"));

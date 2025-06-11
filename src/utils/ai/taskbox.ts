@@ -51,7 +51,7 @@ class Taskbox {
           },
         };
       },
-      {},
+      {}
     );
   }
 
@@ -75,13 +75,13 @@ const pick = hatchet.task({
   fn: async (input: PickInput, ctx) => {
     ctx.logger.info(JSON.stringify(input.toolset, null, 2));
     const { steps } = await generateText({
-      model: openai("gpt-4.1-mini"),
+      model: openai("gpt-4o-mini"),
       tools: input.toolset,
       maxSteps: 5, // allow up to 5 steps
       prompt: input.prompt,
     });
 
-    return { steps: steps.map((step) => step.toolCalls) };
+    return { steps: steps.map(step => step.toolCalls) };
   },
 });
 

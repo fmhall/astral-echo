@@ -16,7 +16,7 @@ export const getProbeStateInput = z.object({
 export const getProbeStateOutput = BaseTaskOutputSchema(
   z.object({
     probe: ProbeSchema,
-  }),
+  })
 );
 
 export const getProbeState = hatchet.task({
@@ -30,7 +30,7 @@ export const getProbeState = hatchet.task({
     }
 
     ctx.logger.info(
-      `[PROBE ${probe.name}] Status: ${probe.status}, Energy: ${probe.resources.energy}`,
+      `[PROBE ${probe.name}] Status: ${probe.status}, Energy: ${probe.resources.energy}`
     );
 
     return getProbeStateOutput.parse({
@@ -55,11 +55,11 @@ export const getEnvironmentStateOutput = BaseTaskOutputSchema(
       z.object({
         body: CelestialBodySchema,
         distance: z.number(),
-      }),
+      })
     ),
     closestBody: CelestialBodySchema,
     distanceToClosest: z.number(),
-  }),
+  })
 );
 
 export const getEnvironmentState = hatchet.task({
@@ -80,7 +80,7 @@ export const getEnvironmentState = hatchet.task({
 
     // Calculate distances to all celestial bodies
     const nearbyBodies = currentSystem.bodies
-      .map((body) => ({
+      .map(body => ({
         body: CelestialBodySchema.parse(body),
         distance: gameState.calculateDistance(probe.position, body.position),
       }))
@@ -89,7 +89,7 @@ export const getEnvironmentState = hatchet.task({
     const closestBody = nearbyBodies[0];
 
     ctx.logger.info(
-      `[PROBE ${probe.name}] Nearest body: ${closestBody.body.name} at ${closestBody.distance.toFixed(1)} AU`,
+      `[PROBE ${probe.name}] Nearest body: ${closestBody.body.name} at ${closestBody.distance.toFixed(1)} AU`
     );
 
     return getEnvironmentStateOutput.parse({
@@ -115,7 +115,7 @@ export const getSolarSystemStateOutput = BaseTaskOutputSchema(
     system: SolarSystemSchema,
     totalResources: z.record(z.any()),
     bodyCount: z.number(),
-  }),
+  })
 );
 
 export const getSolarSystemState = hatchet.task({
@@ -139,7 +139,7 @@ export const getSolarSystemState = hatchet.task({
         silicon: 0,
         hydrogen: system.star.resources.hydrogen,
         rare_elements: 0,
-      },
+      }
     );
 
     return getSolarSystemStateOutput.parse({
@@ -165,7 +165,7 @@ export const scanForResourcesOutput = BaseTaskOutputSchema(
     bodyName: z.string(),
     resources: z.record(z.any()),
     distance: z.number(),
-  }),
+  })
 );
 
 export const scanForResources = hatchet.task({
@@ -185,7 +185,7 @@ export const scanForResources = hatchet.task({
     }
 
     const targetBody = currentSystem.bodies.find(
-      (b) => b.id === input.targetBodyId,
+      b => b.id === input.targetBodyId
     );
 
     if (!targetBody) {
@@ -194,12 +194,12 @@ export const scanForResources = hatchet.task({
 
     const distance = gameState.calculateDistance(
       probe.position,
-      targetBody.position,
+      targetBody.position
     );
 
     if (distance > probe.capabilities.sensorRange) {
       ctx.logger.warn(
-        `[PROBE ${probe.name}] Target ${targetBody.name} is out of sensor range`,
+        `[PROBE ${probe.name}] Target ${targetBody.name} is out of sensor range`
       );
       return scanForResourcesOutput.parse({
         success: false,
@@ -225,7 +225,7 @@ export const scanForResources = hatchet.task({
     gameState.updateProbe(input.probeId, { memory: probe.memory });
 
     ctx.logger.info(
-      `[PROBE ${probe.name}] Scanned ${targetBody.name}: ${JSON.stringify(targetBody.resources)}`,
+      `[PROBE ${probe.name}] Scanned ${targetBody.name}: ${JSON.stringify(targetBody.resources)}`
     );
 
     return scanForResourcesOutput.parse({

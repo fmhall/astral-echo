@@ -26,7 +26,7 @@ async function testSolarSimulation() {
       {
         maxTicks: 8,
         tickDuration: 2000, // 2 seconds between ticks
-      },
+      }
     );
 
     const output = await result.output;
@@ -39,18 +39,18 @@ async function testSolarSimulation() {
   const finalProbes = gameState.getAllProbes();
   if (finalProbes.length > 0) {
     logger.info(`\n🎯 Final Probe States:`);
-    finalProbes.forEach((probe) => {
+    finalProbes.forEach(probe => {
       logger.info(
-        `  • ${probe.name} (Gen ${probe.generation}): E:${probe.resources.energy} M:${probe.resources.metal} S:${probe.resources.silicon} H:${probe.resources.hydrogen} R:${probe.resources.rare_elements}`,
+        `  • ${probe.name} (Gen ${probe.generation}): E:${probe.resources.energy} M:${probe.resources.metal} S:${probe.resources.silicon} H:${probe.resources.hydrogen} R:${probe.resources.rare_elements}`
       );
 
       // Show recent solar charging events
       const solarEvents = probe.memory.experiences
-        .filter((e) => e.event === "solar_charging")
+        .filter(e => e.event === "solar_charging")
         .slice(-3);
       if (solarEvents.length > 0) {
         logger.info(
-          `    Recent solar charging: ${solarEvents.map((e) => `+${e.data.energyGained}E`).join(", ")}`,
+          `    Recent solar charging: ${solarEvents.map(e => `+${e.data.energyGained}E`).join(", ")}`
         );
       }
     });

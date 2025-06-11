@@ -21,7 +21,7 @@ export const travelToPositionOutput = BaseTaskOutputSchema(
     energyUsed: z.number(),
     travelTime: z.number(),
     newPosition: PositionSchema,
-  }),
+  })
 );
 
 export const travelToPosition = hatchet.task({
@@ -36,7 +36,7 @@ export const travelToPosition = hatchet.task({
 
     const distance = gameState.calculateDistance(
       probe.position,
-      input.targetPosition,
+      input.targetPosition
     );
     const travelTime = Math.ceil(distance / probe.capabilities.maxSpeed);
     const energyCost = Math.ceil(distance * 2); // Reduced from 10 to 2 energy per unit distance
@@ -82,7 +82,7 @@ export const travelToPosition = hatchet.task({
     });
 
     ctx.logger.info(
-      `[PROBE ${probe.name}] Traveled ${distance.toFixed(1)} AU to (${input.targetPosition.x}, ${input.targetPosition.y}, ${input.targetPosition.z})`,
+      `[PROBE ${probe.name}] Traveled ${distance.toFixed(1)} AU to (${input.targetPosition.x}, ${input.targetPosition.y}, ${input.targetPosition.z})`
     );
 
     return travelToPositionOutput.parse({
@@ -110,7 +110,7 @@ export const harvestResourcesOutput = BaseTaskOutputSchema(
     harvestedResources: z.record(z.any()),
     duration: z.number(),
     remainingOnBody: z.record(z.any()),
-  }),
+  })
 );
 
 export const harvestResources = hatchet.task({
@@ -130,7 +130,7 @@ export const harvestResources = hatchet.task({
     }
 
     const targetBody = currentSystem.bodies.find(
-      (b) => b.id === input.targetBodyId,
+      b => b.id === input.targetBodyId
     );
 
     if (!targetBody) {
@@ -139,13 +139,13 @@ export const harvestResources = hatchet.task({
 
     const distance = gameState.calculateDistance(
       probe.position,
-      targetBody.position,
+      targetBody.position
     );
 
     if (distance > 1.0) {
       // Must be very close to harvest
       ctx.logger.warn(
-        `[PROBE ${probe.name}] Too far from ${targetBody.name} to harvest`,
+        `[PROBE ${probe.name}] Too far from ${targetBody.name} to harvest`
       );
       return harvestResourcesOutput.parse({
         success: false,
@@ -165,7 +165,7 @@ export const harvestResources = hatchet.task({
       hydrogen: Math.min(harvestAmount, targetBody.resources.hydrogen),
       rare_elements: Math.min(
         harvestAmount,
-        targetBody.resources.rare_elements,
+        targetBody.resources.rare_elements
       ),
     };
 
@@ -195,13 +195,13 @@ export const harvestResources = hatchet.task({
       ...targetBody,
       resources: gameState.subtractResources(
         targetBody.resources,
-        actualHarvest,
+        actualHarvest
       ),
     };
 
     // Update system with the modified body
-    const updatedBodies = currentSystem.bodies.map((b) =>
-      b.id === targetBody.id ? updatedBody : b,
+    const updatedBodies = currentSystem.bodies.map(b =>
+      b.id === targetBody.id ? updatedBody : b
     );
 
     gameState.addSolarSystem({
@@ -225,7 +225,7 @@ export const harvestResources = hatchet.task({
     });
 
     ctx.logger.info(
-      `[PROBE ${probe.name}] Harvested from ${targetBody.name}: ${JSON.stringify(actualHarvest)}`,
+      `[PROBE ${probe.name}] Harvested from ${targetBody.name}: ${JSON.stringify(actualHarvest)}`
     );
 
     return harvestResourcesOutput.parse({
@@ -252,7 +252,7 @@ export const manufactureProbeOutput = BaseTaskOutputSchema(
     newProbeName: z.string(),
     generation: z.number(),
     resourcesUsed: z.record(z.any()),
-  }),
+  })
 );
 
 export const manufactureProbe = hatchet.task({
@@ -269,11 +269,11 @@ export const manufactureProbe = hatchet.task({
     if (
       !gameState.canAffordResources(
         parentProbe.resources,
-        PROBE_REPLICATION_COST,
+        PROBE_REPLICATION_COST
       )
     ) {
       ctx.logger.warn(
-        `[PROBE ${parentProbe.name}] Insufficient resources for replication`,
+        `[PROBE ${parentProbe.name}] Insufficient resources for replication`
       );
       return manufactureProbeOutput.parse({
         success: false,
@@ -326,7 +326,7 @@ export const manufactureProbe = hatchet.task({
       status: "manufacturing",
       resources: gameState.subtractResources(
         parentProbe.resources,
-        PROBE_REPLICATION_COST,
+        PROBE_REPLICATION_COST
       ),
     });
 
@@ -352,7 +352,7 @@ export const manufactureProbe = hatchet.task({
     });
 
     ctx.logger.info(
-      `[PROBE ${parentProbe.name}] Manufactured new probe: ${input.newProbeName} (Generation ${newProbe.generation})`,
+      `[PROBE ${parentProbe.name}] Manufactured new probe: ${input.newProbeName} (Generation ${newProbe.generation})`
     );
 
     return manufactureProbeOutput.parse({

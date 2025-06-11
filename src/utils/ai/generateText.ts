@@ -2,7 +2,7 @@ import { hatchet } from "@/hatchet.client";
 import { generateText as aiGenerateText, Message, CoreMessage } from "ai";
 import { openai } from "@ai-sdk/openai";
 
-export const DEFAULT_MODEL = openai("gpt-4.1-mini");
+export const DEFAULT_MODEL = openai("gpt-4o-mini");
 
 /**
 Prompt part of the AI function options.

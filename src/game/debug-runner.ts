@@ -74,25 +74,25 @@ function showGameState() {
   const allSystems = gameState.getAllSystems();
 
   logger.info(`\n🛸 Probes: ${allProbes.length}`);
-  allProbes.forEach((probe) => {
+  allProbes.forEach(probe => {
     logger.info(
-      `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation} [${probe.status}]`,
+      `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation} [${probe.status}]`
     );
     logger.info(
-      `    Resources: E:${probe.resources.energy} M:${probe.resources.metal} S:${probe.resources.silicon}`,
+      `    Resources: E:${probe.resources.energy} M:${probe.resources.metal} S:${probe.resources.silicon}`
     );
   });
 
   logger.info(`\n🌟 Solar Systems: ${allSystems.length}`);
-  allSystems.forEach((system) => {
+  allSystems.forEach(system => {
     logger.info(`  - ${system.name} (${system.bodies.length} bodies)`);
   });
 
   logger.info(
-    `\n⏰ Game started: ${new Date(state.gameStartedAt).toISOString()}`,
+    `\n⏰ Game started: ${new Date(state.gameStartedAt).toISOString()}`
   );
   logger.info(
-    `⏱️  Uptime: ${((Date.now() - state.gameStartedAt) / 1000).toFixed(1)}s`,
+    `⏱️  Uptime: ${((Date.now() - state.gameStartedAt) / 1000).toFixed(1)}s`
   );
 }
 
@@ -112,10 +112,10 @@ switch (command) {
   default:
     logger.info("Usage:");
     logger.info(
-      "  bun run src/game/debug-runner.ts debug  # Test Hatchet tasks",
+      "  bun run src/game/debug-runner.ts debug  # Test Hatchet tasks"
     );
     logger.info("  bun run src/game/debug-runner.ts reset  # Reset game state");
     logger.info(
-      "  bun run src/game/debug-runner.ts show   # Show current state",
+      "  bun run src/game/debug-runner.ts show   # Show current state"
     );
 }

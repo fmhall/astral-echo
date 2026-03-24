@@ -42,3 +42,6 @@ next-env.d.ts
 
 # game state (runtime data)
 game-state.json
+astral-echo.db
+astral-echo.db-wal
+astral-echo.db-shm

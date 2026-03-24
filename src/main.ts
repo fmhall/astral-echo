@@ -1,70 +1,37 @@
-import { hatchet } from "@/hatchet.client";
-import { gameState } from "@/game/core/game-state";
-import { logger } from "@/utils/logger";
+import { initDb } from "./db/index.js"
+import { seedWorld } from "./db/seed.js"
+import { startWorldTicker } from "./engine/tick.js"
+import { createApp } from "./server.js"
 
-// Import all game tasks
-import {
-  getProbeState,
-  getEnvironmentState,
-  getSolarSystemState,
-  scanForResources,
-} from "@/game/tasks/probe-state-tasks";
+const PORT = Number(process.env["PORT"] ?? 3000)
+const SEED_ON_START = process.env["SEED"] === "1"
 
-import {
-  travelToPosition,
-  harvestResources,
-  manufactureProbe,
-} from "@/game/tasks/probe-action-tasks";
+// Initialize database
+initDb()
 
-import { runProbeAgent } from "@/game/agents/probe-agent";
+// Seed world if requested or if this is first run
+if (SEED_ON_START) {
+	seedWorld()
+}
 
-import {
-  runSimulation,
-  getSimulationStatus,
-} from "@/game/simulation/astral-echo-simulation";
+// Create and start server
+const app = createApp()
 
-const main = async () => {
-  logger.info("🚀 Starting Astral Echo Worker...");
+// Start world ticker (port restocking, ship arrivals)
+startWorldTicker()
 
-  // Initialize game state in the worker process
-  logger.info("🎮 Initializing game state in worker process...");
-  const allProbes = gameState.getAllProbes();
+console.log(`
+╔══════════════════════════════════════════════╗
+║           A S T R A L   E C H O             ║
+║         Agent Trading API v2.0.0            ║
+╠══════════════════════════════════════════════╣
+║  Port: ${String(PORT).padEnd(37)}║
+║  Dev mode: ${(process.env["ASTRAL_DEV"] === "1" ? "ON" : "OFF").padEnd(33)}║
+║  Docs: http://localhost:${String(PORT).padEnd(20)}║
+╚══════════════════════════════════════════════╝
+`)
 
-  logger.info(`🛸 Initialized with ${allProbes.length} probes:`);
-  allProbes.forEach((probe) => {
-    logger.info(
-      `  - ${probe.name} (${probe.id.slice(0, 8)}...) Gen ${probe.generation}`,
-    );
-  });
-
-  const worker = await hatchet.worker("astral-echo", {
-    workflows: [
-      // Core probe state tasks
-      getProbeState,
-      getEnvironmentState,
-      getSolarSystemState,
-      scanForResources,
-
-      // Probe action tasks
-      travelToPosition,
-      harvestResources,
-      manufactureProbe,
-
-      // AI agent
-      runProbeAgent,
-
-      // Simulation orchestrator
-      runSimulation,
-      getSimulationStatus,
-    ],
-  });
-
-  logger.info("🎮 Astral Echo Worker ready! Game systems initialized.");
-  logger.info(
-    "🌌 Ready to simulate self-replicating probes exploring the stars...",
-  );
-
-  await worker.start();
-};
-
-main().catch((error) => logger.error({ error }, "Failed to start worker"));
+export default {
+	port: PORT,
+	fetch: app.fetch,
+}
